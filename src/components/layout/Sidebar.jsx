@@ -1,0 +1,56 @@
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+
+const AFFILIATE_ITEMS = [
+  { to: '/', label: 'Home', icon: '🏠', end: true },
+  { to: '/calendar', label: 'Calendar', icon: '🗓️' },
+  { to: '/add', label: 'Add Post', icon: '➕' },
+  { to: '/ideas', label: 'Ideas', icon: '💡' },
+  { to: '/ranking', label: 'Ranking', icon: '🏆' },
+];
+
+const ADMIN_ITEMS = [
+  { to: '/admin', label: 'Dashboard', icon: '📊', end: true },
+  { to: '/admin/affiliates', label: 'Affiliates', icon: '👥' },
+  { to: '/admin/posts', label: 'Posts', icon: '📝' },
+  { to: '/admin/ideas', label: 'Ideas', icon: '💡' },
+  { to: '/admin/ranking', label: 'Leaderboard', icon: '🏆' },
+  { to: '/admin/reports', label: 'Reports', icon: '📈' },
+];
+
+export default function Sidebar({ role }) {
+  const { currentUser, logout } = useAuth();
+  const items = role === 'admin' ? ADMIN_ITEMS : AFFILIATE_ITEMS;
+
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-brand">
+        <span className="sidebar-brand-mark">✏️</span>
+        <span>Affiliate Calendar</span>
+      </div>
+      <nav className="sidebar-nav">
+        {items.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+          >
+            <span>{item.icon}</span>
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+      <div className="sidebar-footer">
+        <div className="sidebar-user">
+          <div className="avatar">{currentUser?.name?.[0]?.toUpperCase() || '?'}</div>
+          <div>
+            <div className="sidebar-user-name">{currentUser?.name}</div>
+            <div className="sidebar-user-role">{currentUser?.role}</div>
+          </div>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={logout}>Switch user</button>
+      </div>
+    </aside>
+  );
+}

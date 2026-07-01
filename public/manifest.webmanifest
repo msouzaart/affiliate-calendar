@@ -1,0 +1,12 @@
+{
+  "name": "Affiliate Calendar",
+  "short_name": "AffCal",
+  "description": "Plan, post, and track your affiliate content.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF7F2",
+  "theme_color": "#FF8A5B",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

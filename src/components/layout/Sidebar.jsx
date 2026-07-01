@@ -1,21 +1,24 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import Logo from '../ui/Logo';
 
 const AFFILIATE_ITEMS = [
   { to: '/', label: 'Home', icon: '🏠', end: true },
   { to: '/calendar', label: 'Calendar', icon: '🗓️' },
   { to: '/add', label: 'Add Post', icon: '➕' },
-  { to: '/ideas', label: 'Ideas', icon: '💡' },
+  { to: '/ideas', label: 'Ideas & Examples', icon: '💡' },
   { to: '/ranking', label: 'Ranking', icon: '🏆' },
+  { to: '/profile', label: 'Profile', icon: '👤' },
 ];
 
 const ADMIN_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: '📊', end: true },
   { to: '/admin/affiliates', label: 'Affiliates', icon: '👥' },
   { to: '/admin/posts', label: 'Posts', icon: '📝' },
-  { to: '/admin/ideas', label: 'Ideas', icon: '💡' },
+  { to: '/admin/ideas', label: 'Ideas Library', icon: '💡' },
   { to: '/admin/ranking', label: 'Leaderboard', icon: '🏆' },
   { to: '/admin/reports', label: 'Reports', icon: '📈' },
+  { to: '/admin/settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export default function Sidebar({ role }) {
@@ -24,9 +27,8 @@ export default function Sidebar({ role }) {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
-        <span className="sidebar-brand-mark">✏️</span>
-        <span>Affiliate Calendar</span>
+      <div className="sidebar-brand-wrap">
+        <Logo size={32} compact />
       </div>
       <nav className="sidebar-nav">
         {items.map((item) => (
@@ -49,7 +51,7 @@ export default function Sidebar({ role }) {
             <div className="sidebar-user-role">{currentUser?.role}</div>
           </div>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={logout}>Switch user</button>
+        <button className="btn btn-ghost btn-sm" onClick={logout}>Sign out</button>
       </div>
     </aside>
   );

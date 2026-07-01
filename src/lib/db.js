@@ -26,6 +26,9 @@ function defaultDB() {
         role: 'admin',
         affiliate_code: null,
         avatar_url: null,
+        username: null,
+        password: null, // set on first admin sign-in — mock only, not real security
+        saved_idea_ids: [],
         created_at: now,
         last_active_at: now,
       },
@@ -90,7 +93,7 @@ function generateAffiliateCode(name) {
   return `${base}${suffix}`;
 }
 
-export function createUser({ name, email, role = 'affiliate' }) {
+export function createUser({ name, email, role = 'affiliate', username, password }) {
   const now = new Date().toISOString();
   const user = {
     id: uid('user'),
@@ -99,6 +102,9 @@ export function createUser({ name, email, role = 'affiliate' }) {
     role,
     affiliate_code: role === 'affiliate' ? generateAffiliateCode(name) : null,
     avatar_url: null,
+    username: username?.trim() || null,
+    password: password || null, // mock only — plaintext, local device storage, not real security
+    saved_idea_ids: [],
     created_at: now,
     last_active_at: now,
   };
@@ -111,6 +117,108 @@ export function touchUserActive(id) {
   const u = getUser(id);
   if (!u) return;
   u.last_active_at = new Date().toISOString();
+  persist();
+}
+
+export function updateUser(id, patch) {
+  const u = getUser(id);
+  if (!u) return null;
+  Object.assign(u, patch);
+  persist();
+  return u;
+}
+
+export function changeAdminPassword(oldPassword, newPassword) {
+  const admin = DB.users.find((u) => u.role === 'admin');
+  if (!admin) return { error: 'No admin account found.' };
+  if (admin.password && admin.password !== oldPassword) return { error: 'Current password is incorrect.' };
+  admin.password = newPassword;
+  persist();
+  return { user: admin };
+}
+
+// ---------------------------------------------------------------------------
+// Mock auth (local device only — no real backend/security)
+// ---------------------------------------------------------------------------
+
+function findByIdentifier(identifier, role) {
+  const needle = (identifier || '').trim().toLowerCase();
+  if (!needle) return null;
+  return (
+    DB.users.find(
+      (u) =>
+        u.role === role &&
+        ((u.email && u.email.toLowerCase() === needle) || (u.username && u.username.toLowerCase() === needle))
+    ) || null
+  );
+}
+
+export function isEmailOrUsernameTaken(identifier) {
+  const needle = (identifier || '').trim().toLowerCase();
+  if (!needle) return false;
+  return DB.users.some(
+    (u) => (u.email && u.email.toLowerCase() === needle) || (u.username && u.username.toLowerCase() === needle)
+  );
+}
+
+export function signUpAffiliate({ name, email, username, password }) {
+  if (isEmailOrUsernameTaken(email) || isEmailOrUsernameTaken(username)) {
+    return { error: 'That email or username is already in use.' };
+  }
+  const user = createUser({ name, email, role: 'affiliate', username, password });
+  return { user };
+}
+
+export function signInAffiliate({ identifier, password }) {
+  const user = findByIdentifier(identifier, 'affiliate');
+  if (!user) return { error: 'No affiliate found with that email or username.' };
+  if (!user.password) return { error: 'This account has no password set yet. Create a new account instead.' };
+  if (user.password !== password) return { error: 'Incorrect password.' };
+  return { user };
+}
+
+export function adminNeedsSetup() {
+  const admin = DB.users.find((u) => u.role === 'admin');
+  return !!admin && !admin.password;
+}
+
+export function setAdminPassword(password) {
+  const admin = DB.users.find((u) => u.role === 'admin');
+  if (!admin) return null;
+  admin.password = password;
+  persist();
+  return admin;
+}
+
+export function signInAdmin({ email, password }) {
+  const admin = DB.users.find((u) => u.role === 'admin');
+  if (!admin) return { error: 'No admin account found.' };
+  if (admin.email.toLowerCase() !== (email || '').trim().toLowerCase()) {
+    return { error: 'No admin found with that email.' };
+  }
+  if (!admin.password) return { error: 'Admin password has not been set up yet.' };
+  if (admin.password !== password) return { error: 'Incorrect password.' };
+  return { user: admin };
+}
+
+// ---------------------------------------------------------------------------
+// Saved ideas (bookmarks)
+// ---------------------------------------------------------------------------
+
+export function isIdeaSaved(userId, ideaId) {
+  const u = getUser(userId);
+  return !!u?.saved_idea_ids?.includes(ideaId);
+}
+
+export function toggleSavedIdea(userId, ideaId) {
+  const u = getUser(userId);
+  if (!u) return;
+  if (!u.saved_idea_ids) u.saved_idea_ids = [];
+  if (u.saved_idea_ids.includes(ideaId)) {
+    u.saved_idea_ids = u.saved_idea_ids.filter((id) => id !== ideaId);
+  } else {
+    u.saved_idea_ids.push(ideaId);
+  }
   persist();
 }
 
@@ -334,6 +442,12 @@ export function createIdea(data) {
     estimated_time: data.estimated_time || '15 min',
     is_active: true,
     used_count: 0,
+    sample_caption: data.sample_caption || data.hook || '',
+    why_this_works: data.why_this_works || [],
+    assets: data.assets || [],
+    suggested_cta: data.suggested_cta || data.cta || '',
+    recommended_audience: data.recommended_audience || '',
+    best_time_to_post: data.best_time_to_post || '',
     created_at: new Date().toISOString(),
   };
   DB.ideas.unshift(idea);

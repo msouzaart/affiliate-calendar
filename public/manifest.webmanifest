@@ -1,11 +1,11 @@
 {
-  "name": "Affiliate Calendar",
-  "short_name": "AffCal",
-  "description": "Plan, post, and track your affiliate content.",
+  "name": "Chalky CampaignFlow",
+  "short_name": "CampaignFlow",
+  "description": "Affiliate posting calendar & campaign tracker.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FAF7F2",
-  "theme_color": "#FF8A5B",
+  "background_color": "#F5F8FC",
+  "theme_color": "#102033",
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]

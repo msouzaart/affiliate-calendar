@@ -1,6 +1,7 @@
-// Single place to set the name of the program/product your affiliates promote.
-// Used as a fallback in admin defaults and exported for use in custom ideas
-// or copy you add later. Change this when you onboard a new client/program.
-export const PROGRAM_NAME = 'your program';
+// Brand identity for this deployment. Change these if you point the app at a
+// different program/client later.
+export const APP_NAME = 'Chalky CampaignFlow';
+export const APP_DESCRIPTOR = 'Affiliate posting calendar & campaign tracker';
+export const PROGRAM_NAME = 'Chalky';
 export const DEFAULT_ADMIN_NAME = 'Program Admin';
-export const DEFAULT_ADMIN_EMAIL = 'admin@example.com';
+export const DEFAULT_ADMIN_EMAIL = 'admin@chalky.com';

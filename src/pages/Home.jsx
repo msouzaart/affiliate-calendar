@@ -71,9 +71,9 @@ export default function Home() {
 
   return (
     <div className="screen">
-      <h1 className="greeting">Hi, {currentUser.name.split(' ')[0]} 👋</h1>
+      <h1 className="greeting" data-tour="home-welcome">Hi, {currentUser.name.split(' ')[0]} 👋</h1>
 
-      <section className="card">
+      <section className="card" data-tour="week-summary">
         <div className="card-section-title">This Week</div>
         <div className="stat-grid">
           <Stat label="Posts published" value={published.length} accent />
@@ -84,7 +84,7 @@ export default function Home() {
       </section>
 
       {needsResults.length > 0 && (
-        <section className="card card-action">
+        <section className="card card-action" data-tour="next-action">
           <div className="card-section-title">Next Action</div>
           <p>
             You have {needsResults.length} post{needsResults.length > 1 ? 's' : ''} waiting for reported results.
@@ -95,7 +95,7 @@ export default function Home() {
         </section>
       )}
 
-      <section className="card">
+      <section className="card" data-tour="today-card">
         <div className="card-section-title">Today</div>
         {todayPost ? (
           <div className="today-post">
@@ -105,7 +105,7 @@ export default function Home() {
               <StatusChip status={todayPost.status} />
             </div>
             {todayPost.status === 'Planned' ? (
-              <button className="btn btn-primary btn-sm" onClick={() => markPosted(todayPost)}>
+              <button className="btn btn-primary btn-sm" data-tour="mark-posted-btn" onClick={() => markPosted(todayPost)}>
                 Mark as posted
               </button>
             ) : (
@@ -129,7 +129,7 @@ export default function Home() {
       </section>
 
       {badges.length > 0 && (
-        <section className="card">
+        <section className="card" data-tour="badges-section">
           <div className="card-section-title">Your badges</div>
           <div className="badge-row">
             {badges.map((b) => (

@@ -109,7 +109,7 @@ export default function AdminDashboard() {
       <div className="screen">
         <div className="screen-header">
           <div>
-            <h1>Admin dashboard</h1>
+            <h1 data-tour="admin-welcome">Admin dashboard</h1>
             <p className="screen-subtitle">Here's what's happening with your program this week.</p>
           </div>
           {headerActions}
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
     <div className="screen">
       <div className="screen-header">
         <div>
-          <h1>Admin dashboard</h1>
+          <h1 data-tour="admin-welcome">Admin dashboard</h1>
           <p className="screen-subtitle">Here's what's happening with your program this week.</p>
         </div>
         {headerActions}
@@ -132,7 +132,7 @@ export default function AdminDashboard() {
 
       {inviteCard}
 
-      <section className="card">
+      <section className="card" data-tour="admin-week-stats">
         <div className="card-section-title">This week</div>
         <div className="stat-grid stat-grid-admin">
           <Stat label="Posts this week" value={weekPublished.length} accent />
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
       </section>
 
       {winnerCandidate && (
-        <section className="card card-action">
+        <section className="card card-action" data-tour="weekly-winner">
           <div className="card-section-title">Top affiliate of the week</div>
           <p>
             🎉 <strong>{winnerCandidate.user.name}</strong> is leading this week with {winnerCandidate.points} points,
@@ -180,7 +180,7 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      <section className="card">
+      <section className="card" data-tour="admin-feedback">
         <div className="card-section-title">Best feedback</div>
         {bestFeedback.length === 0 ? (
           <p className="muted">No feedback collected yet.</p>

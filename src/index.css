@@ -462,3 +462,45 @@ button { font-family: inherit; cursor: pointer; }
   .modal-overlay { align-items: center; }
   .modal-card { border-radius: 16px; }
 }
+
+/* Guided walkthrough / product tour */
+.tour-click-blocker {
+  position: fixed; inset: 0; z-index: 9996; background: transparent;
+}
+.tour-spotlight {
+  position: fixed; z-index: 9997; border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(16, 32, 51, 0.6);
+  border: 2px solid var(--coral);
+  pointer-events: none;
+  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+.tour-tooltip {
+  position: fixed; z-index: 9999; width: 340px; max-width: calc(100vw - 32px);
+  background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-card-hover);
+  padding: 18px 18px 16px;
+}
+.tour-tooltip-center {
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+}
+.tour-close-btn {
+  position: absolute; top: 10px; right: 10px; background: none; border: none;
+  color: var(--text-muted); font-size: 15px; padding: 4px 6px; border-radius: 6px; line-height: 1;
+}
+.tour-close-btn:hover { background: #F1F5FB; color: var(--text-secondary); }
+.tour-progress {
+  font-size: 11px; font-weight: 700; color: var(--coral); text-transform: uppercase;
+  letter-spacing: 0.04em; margin-bottom: 6px;
+}
+.tour-title { font-family: var(--font-heading); font-weight: 700; color: var(--navy); font-size: 16px; margin-bottom: 6px; padding-right: 20px; }
+.tour-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px; }
+.tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.tour-actions-right { display: flex; gap: 8px; }
+
+/* Mobile bottom-sheet variant */
+.tour-tooltip-sheet {
+  left: 0; right: 0; bottom: 0; top: auto; width: 100%; max-width: 100%;
+  border-radius: 18px 18px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+  box-shadow: 0 -6px 24px rgba(16, 32, 51, 0.18);
+}
+.tour-tooltip-sheet .tour-actions-right .btn,
+.tour-tooltip-sheet .tour-actions .btn { padding: 11px 16px; font-size: 14px; }

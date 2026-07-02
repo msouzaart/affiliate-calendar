@@ -101,7 +101,7 @@ export default function Ideas({ adminView = false }) {
           </p>
         </div>
         {adminView ? (
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowForm((s) => !s)}>
+          <button className="btn btn-secondary btn-sm" data-tour="ideas-admin-toggle" onClick={() => setShowForm((s) => !s)}>
             {showForm ? 'Close' : '+ Add idea'}
           </button>
         ) : (

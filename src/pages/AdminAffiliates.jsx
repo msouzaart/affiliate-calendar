@@ -108,7 +108,7 @@ export default function AdminAffiliates() {
       ) : rows.length === 0 ? (
         <EmptyState emoji="👥" title="No affiliates match these filters" />
       ) : (
-        <div className="table-wrap card">
+        <div className="table-wrap card" data-tour="affiliate-table">
           <table className="data-table">
             <thead>
               <tr>

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useWalkthrough } from '../context/WalkthroughContext';
 import { APP_NAME, APP_DESCRIPTOR, PROGRAM_NAME } from '../lib/config';
 
 export default function AdminSettings() {
   const { currentUser, changeOwnPassword } = useAuth();
+  const { start: startWalkthrough } = useWalkthrough();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -37,6 +39,16 @@ export default function AdminSettings() {
         <p className="field-note" style={{ marginTop: 10 }}>
           To rebrand for a different program, edit <code>src/lib/config.js</code> in the codebase.
         </p>
+      </section>
+
+      <section className="card">
+        <div className="card-section-title">Help & Onboarding</div>
+        <p className="muted" style={{ marginBottom: 10 }}>
+          Want a refresher on the admin tools? Replay the guided tour anytime.
+        </p>
+        <button className="btn btn-secondary btn-sm" onClick={() => startWalkthrough('admin')}>
+          🔄 Replay walkthrough
+        </button>
       </section>
 
       <section className="card">

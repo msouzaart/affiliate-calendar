@@ -4,10 +4,10 @@ import Logo from '../ui/Logo';
 
 const AFFILIATE_ITEMS = [
   { to: '/', label: 'Home', icon: '🏠', end: true },
-  { to: '/calendar', label: 'Calendar', icon: '🗓️' },
-  { to: '/add', label: 'Add Post', icon: '➕' },
-  { to: '/ideas', label: 'Ideas & Examples', icon: '💡' },
-  { to: '/ranking', label: 'Ranking', icon: '🏆' },
+  { to: '/calendar', label: 'Calendar', icon: '🗓️', tour: 'nav-calendar' },
+  { to: '/add', label: 'Add Post', icon: '➕', tour: 'nav-add-post' },
+  { to: '/ideas', label: 'Ideas & Examples', icon: '💡', tour: 'nav-ideas' },
+  { to: '/ranking', label: 'Ranking', icon: '🏆', tour: 'nav-ranking' },
   { to: '/profile', label: 'Profile', icon: '👤' },
 ];
 
@@ -16,7 +16,7 @@ const ADMIN_ITEMS = [
   { to: '/admin/affiliates', label: 'Affiliates', icon: '👥' },
   { to: '/admin/posts', label: 'Posts', icon: '📝' },
   { to: '/admin/ideas', label: 'Ideas Library', icon: '💡' },
-  { to: '/admin/ranking', label: 'Leaderboard', icon: '🏆' },
+  { to: '/admin/ranking', label: 'Leaderboard', icon: '🏆', tour: 'nav-admin-ranking' },
   { to: '/admin/reports', label: 'Reports', icon: '📈' },
   { to: '/admin/settings', label: 'Settings', icon: '⚙️' },
 ];
@@ -36,6 +36,7 @@ export default function Sidebar({ role }) {
             key={item.to}
             to={item.to}
             end={item.end}
+            data-tour={item.tour}
             className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
           >
             <span>{item.icon}</span>

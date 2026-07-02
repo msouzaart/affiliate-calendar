@@ -81,7 +81,7 @@ export default function AdminReports() {
           <section className="card">
             <div className="card-section-title">Export</div>
             <p className="muted">Download all posts in this period as a CSV file, including reported results and points.</p>
-            <button className="btn btn-primary" onClick={handleExport}>Export posts (.csv)</button>
+            <button className="btn btn-primary" data-tour="export-btn" onClick={handleExport}>Export posts (.csv)</button>
           </section>
 
           <section className="card">

@@ -49,7 +49,7 @@ export default function AdminPosts() {
     <div className="screen">
       <h1>Posts</h1>
 
-      <div className="filter-bar">
+      <div className="filter-bar" data-tour="admin-filters">
         <select className="select select-sm" value={period} onChange={(e) => setPeriod(e.target.value)}>
           {PERIODS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
         </select>
@@ -72,7 +72,7 @@ export default function AdminPosts() {
       ) : posts.length === 0 ? (
         <EmptyState emoji="📝" title="No posts match these filters" />
       ) : (
-        <div className="table-wrap card">
+        <div className="table-wrap card" data-tour="reported-results-table">
           <table className="data-table">
             <thead>
               <tr>

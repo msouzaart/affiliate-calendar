@@ -68,6 +68,16 @@ export default function AddPost({ editMode }) {
     return () => { alive = false; };
   }, [editMode, id, location.state]);
 
+  // The guided walkthrough highlights the (collapsed by default) reported
+  // results / feedback fields — it asks us to expand that section first.
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail === 'expandResults') setShowResults(true);
+    };
+    window.addEventListener('chalky:tour-action', handler);
+    return () => window.removeEventListener('chalky:tour-action', handler);
+  }, []);
+
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const handleSubmit = async (e) => {
@@ -97,7 +107,7 @@ export default function AddPost({ editMode }) {
       <h1>{editMode ? 'Edit Post' : 'Add Post'}</h1>
       <p className="screen-subtitle">Takes less than a minute. Results fields are optional.</p>
 
-      <form className="card form" onSubmit={handleSubmit}>
+      <form className="card form" data-tour="add-post-form" onSubmit={handleSubmit}>
         <label className="field-label">Post title *</label>
         <input className="input" value={form.title} onChange={update('title')} placeholder="Summer Math Practice Reel" required />
 
@@ -140,7 +150,10 @@ export default function AddPost({ editMode }) {
         <input className="input" type="url" value={form.post_link} onChange={update('post_link')} placeholder="https://instagram.com/p/..." />
         <div className="field-note">The actual published post — add this once it's live.</div>
 
-        <button type="button" className="collapse-toggle" onClick={() => setShowResults((s) => !s)}>
+        <button
+          type="button" className="collapse-toggle" data-tour="reported-results-toggle"
+          onClick={() => setShowResults((s) => !s)}
+        >
           {showResults ? '− Hide reported results & feedback' : '+ Add reported results & feedback (optional)'}
         </button>
 
@@ -178,7 +191,10 @@ export default function AddPost({ editMode }) {
               </div>
             </div>
             <label className="field-label">Feedback / parent questions</label>
-            <textarea className="textarea" rows={3} value={form.feedback} onChange={update('feedback')} placeholder="What did parents say or ask?" />
+            <textarea
+              className="textarea" data-tour="feedback-field" rows={3} value={form.feedback}
+              onChange={update('feedback')} placeholder="What did parents say or ask?"
+            />
           </div>
         )}
 

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useWalkthrough } from '../context/WalkthroughContext';
 import { updateUser, listBadges, getAffiliateStats } from '../lib/db';
 import Badge from '../components/ui/Badge';
 import Stat from '../components/ui/Stat';
 
 export default function Profile() {
   const { currentUser } = useAuth();
+  const { start: startWalkthrough } = useWalkthrough();
   const [name, setName] = useState(currentUser.name);
   const [email, setEmail] = useState(currentUser.email);
   const [saved, setSaved] = useState(false);
@@ -73,6 +75,16 @@ export default function Profile() {
           )}
         </>
       )}
+
+      <section className="card">
+        <div className="card-section-title">Help & Onboarding</div>
+        <p className="muted" style={{ marginBottom: 10 }}>
+          Want a refresher on how the app works? Replay the guided tour anytime.
+        </p>
+        <button className="btn btn-secondary btn-sm" onClick={() => startWalkthrough('affiliate')}>
+          🔄 Replay walkthrough
+        </button>
+      </section>
 
       <section className="card">
         <div className="card-section-title">Edit profile</div>

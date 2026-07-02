@@ -68,6 +68,10 @@ export async function createProfile(uid, { name, email, role = 'affiliate' }) {
     affiliate_code: role === 'affiliate' ? generateAffiliateCode(name) : null,
     avatar_url: null,
     saved_idea_ids: [],
+    has_completed_affiliate_walkthrough: false,
+    has_completed_admin_walkthrough: false,
+    last_walkthrough_seen_at: null,
+    walkthrough_version: 0,
     created_at: now,
     last_active_at: now,
   };

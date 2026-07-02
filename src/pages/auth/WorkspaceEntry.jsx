@@ -6,15 +6,28 @@ export default function WorkspaceEntry({ onContinue }) {
   const [value, setValue] = useState('');
   const [showInvite, setShowInvite] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
+  const [error, setError] = useState('');
+
+  const matchesProgram = (text) => text.trim().toLowerCase() === PROGRAM_NAME.toLowerCase();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onContinue(value.trim() || PROGRAM_NAME);
+    if (!matchesProgram(value)) {
+      setError(`We couldn't find that workspace. Try "${PROGRAM_NAME}".`);
+      return;
+    }
+    setError('');
+    onContinue(PROGRAM_NAME);
   };
 
   const handleInvite = (e) => {
     e.preventDefault();
-    onContinue(inviteCode.trim() || PROGRAM_NAME);
+    if (!matchesProgram(inviteCode)) {
+      setError(`That invite code doesn't match a workspace. Try "${PROGRAM_NAME}".`);
+      return;
+    }
+    setError('');
+    onContinue(PROGRAM_NAME);
   };
 
   return (
@@ -39,6 +52,7 @@ export default function WorkspaceEntry({ onContinue }) {
                 onChange={(e) => setValue(e.target.value)}
               />
               <div className="field-note">Examples: {PROGRAM_NAME}, {PROGRAM_NAME.toLowerCase()}, or your invite code</div>
+              {error && <div className="chip chip-amber" style={{ margin: '4px 0 10px' }}>{error}</div>}
               <button type="submit" className="btn btn-primary btn-block">Continue →</button>
             </form>
           ) : (
@@ -50,12 +64,13 @@ export default function WorkspaceEntry({ onContinue }) {
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
               />
+              {error && <div className="chip chip-amber" style={{ margin: '4px 0 10px' }}>{error}</div>}
               <button type="submit" className="btn btn-primary btn-block">Continue →</button>
             </form>
           )}
 
           <div className="auth-footer-link">
-            <button className="btn btn-ghost btn-sm" type="button" onClick={() => setShowInvite((s) => !s)}>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setShowInvite((s) => !s); setError(''); }}>
               {showInvite ? 'Search by company or program instead' : 'I have an invite link'}
             </button>
           </div>

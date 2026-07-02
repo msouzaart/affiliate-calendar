@@ -18,9 +18,15 @@ export default function AdminSignIn({ onBack }) {
 
   useEffect(() => {
     let alive = true;
-    adminNeedsSetup().then((result) => {
-      if (alive) { setNeedsSetup(result); setChecking(false); }
-    });
+    adminNeedsSetup()
+      .then((result) => {
+        if (alive) { setNeedsSetup(result); setChecking(false); }
+      })
+      .catch(() => {
+        // If the check itself fails (e.g. rules not published yet), don't hang
+        // forever — fall back to the normal sign-in form.
+        if (alive) { setNeedsSetup(false); setChecking(false); }
+      });
     return () => { alive = false; };
   }, [adminNeedsSetup]);
 

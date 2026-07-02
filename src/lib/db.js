@@ -15,6 +15,24 @@ const col = (name) => collection(firestore, name);
 const docToObj = (d) => ({ id: d.id, ...d.data() });
 
 // ---------------------------------------------------------------------------
+// Admin status (public flag — lets the sign-in screen check "does an admin
+// account exist yet?" before anyone is authenticated)
+// ---------------------------------------------------------------------------
+
+export async function checkAdminExists() {
+  try {
+    const snap = await getDoc(doc(firestore, 'meta', 'adminStatus'));
+    return snap.exists() && snap.data().exists === true;
+  } catch (e) {
+    return false;
+  }
+}
+
+export async function markAdminCreated() {
+  await setDoc(doc(firestore, 'meta', 'adminStatus'), { exists: true });
+}
+
+// ---------------------------------------------------------------------------
 // Profiles (users)
 // ---------------------------------------------------------------------------
 

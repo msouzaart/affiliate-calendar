@@ -4,7 +4,10 @@ import {
   EmailAuthProvider, reauthenticateWithCredential, updatePassword,
 } from 'firebase/auth';
 import { auth } from '../lib/firebaseClient';
-import { getUser, createProfile, touchUserActive, listUsers, updateUser } from '../lib/db';
+import {
+  getUser, createProfile, touchUserActive, updateUser,
+  checkAdminExists, markAdminCreated,
+} from '../lib/db';
 
 const AuthContext = createContext(null);
 
@@ -15,6 +18,9 @@ function friendlyAuthError(error) {
   if (code.includes('weak-password')) return 'Choose a password with at least 6 characters.';
   if (code.includes('user-not-found') || code.includes('invalid-credential') || code.includes('wrong-password')) {
     return 'Incorrect email or password.';
+  }
+  if (code.includes('permission-denied') || error?.message?.includes('insufficient permissions')) {
+    return 'The database rules are blocking this — make sure firestore.rules has been published in the Firebase console.';
   }
   return error?.message || 'Something went wrong. Please try again.';
 }
@@ -69,8 +75,8 @@ export function AuthProvider({ children }) {
   };
 
   const adminNeedsSetup = async () => {
-    const admins = await listUsers({ role: 'admin' });
-    return admins.length === 0;
+    const exists = await checkAdminExists();
+    return !exists;
   };
 
   const signInAdminUser = async ({ email, password }) => {
@@ -92,6 +98,7 @@ export function AuthProvider({ children }) {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const profile = await createProfile(cred.user.uid, { name: name || 'Program Admin', email, role: 'admin' });
+      await markAdminCreated();
       setCurrentUser(profile);
       return { user: profile };
     } catch (error) {

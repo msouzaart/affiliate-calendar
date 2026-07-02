@@ -372,3 +372,93 @@ button { font-family: inherit; cursor: pointer; }
 .profile-avatar { width: 64px; height: 64px; font-size: 22px; }
 .profile-name { font-size: 18px; font-weight: 700; color: var(--navy); }
 .profile-meta { color: var(--text-secondary); font-size: 13px; }
+
+/* Filter bar items keep a natural width so they sit side by side */
+.filter-bar > .select, .filter-bar > .input { width: auto; flex: 1 1 160px; min-width: 130px; }
+
+/* Month calendar grid */
+.month-grid { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; background: var(--card-bg); }
+.month-grid-daynames { display: grid; grid-template-columns: repeat(7, 1fr); background: #EEF2F8; }
+.month-grid-dayname { padding: 8px 4px; text-align: center; font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+.month-grid-weeks { display: flex; flex-direction: column; }
+.month-grid-week { display: grid; grid-template-columns: repeat(7, 1fr); }
+.month-cell {
+  min-height: 92px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 6px; display: flex; flex-direction: column; gap: 3px; cursor: pointer; background: var(--card-bg);
+}
+.month-cell:nth-child(7n) { border-right: none; }
+.month-cell.outside { background: #FAFBFD; }
+.month-cell.today { background: var(--coral-light); }
+.month-cell-date { font-size: 12px; font-weight: 700; color: var(--text-secondary); }
+.month-cell.outside .month-cell-date { color: var(--text-muted); }
+.month-cell.today .month-cell-date { color: var(--coral); }
+.month-cell-post {
+  font-size: 10px; padding: 2px 5px; border-radius: 4px; background: var(--info-light); color: var(--info);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;
+}
+.month-cell-more { font-size: 10px; color: var(--text-muted); }
+
+/* Week strip calendar */
+.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.week-day-col { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 6px; min-height: 140px; background: var(--card-bg); }
+.week-day-col.today { border-color: var(--coral); }
+.week-day-header { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center; margin-bottom: 6px; }
+.week-day-header .day-num { display: block; font-size: 14px; color: var(--navy); }
+.week-day-post { font-size: 10px; padding: 3px 5px; border-radius: 4px; background: var(--info-light); color: var(--info); margin-bottom: 4px; cursor: pointer; }
+
+/* Post Detail redesign */
+.icon-circle {
+  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 16px; background: var(--info-light); color: var(--info); flex-shrink: 0;
+}
+.icon-circle-lg { width: 56px; height: 56px; font-size: 24px; margin: 0 auto 10px; }
+.next-step-banner {
+  display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: var(--radius-md);
+  background: var(--coral-light); flex-wrap: wrap;
+}
+.next-step-banner .icon-circle { background: #fff; color: var(--coral); }
+.next-step-text { flex: 1; min-width: 160px; }
+.next-step-label { font-size: 11px; font-weight: 700; color: var(--coral); letter-spacing: 0.03em; text-transform: uppercase; }
+.next-step-title { font-weight: 700; color: var(--navy); margin: 2px 0; }
+.next-step-subtitle { font-size: 13px; color: var(--text-secondary); }
+.detail-two-col { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+@media (min-width: 800px) { .detail-two-col { grid-template-columns: 1fr 1fr; } }
+.card-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.card-title-row strong { color: var(--navy); font-size: 15px; }
+.kv-row { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.kv-row:last-of-type { border-bottom: none; }
+.kv-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+.kv-value { font-size: 14px; color: var(--text); }
+.result-field-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.result-field-row:last-of-type { border-bottom: none; }
+.result-field-label { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
+.more-actions-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 500px) { .more-actions-grid { grid-template-columns: repeat(3, 1fr); } }
+.empty-illustration { text-align: center; padding: 18px 8px; }
+.empty-illustration p { color: var(--text-secondary); font-size: 13px; margin: 4px 0 0; }
+.empty-illustration strong { display: block; color: var(--navy); font-size: 14px; margin-top: 2px; }
+
+/* Day-detail modal (Calendar month view, multiple posts on one day) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 32, 51, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+  padding: 0;
+}
+.modal-card {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 18px 16px 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+@media (min-width: 640px) {
+  .modal-overlay { align-items: center; }
+  .modal-card { border-radius: 16px; }
+}

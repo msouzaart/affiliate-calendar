@@ -61,6 +61,8 @@ export default function AddPost({ editMode }) {
             idea_id: idea.id,
           });
         }
+      } else if (location.state?.defaultDate) {
+        setForm((f) => ({ ...f, date: location.state.defaultDate }));
       }
     })();
     return () => { alive = false; };

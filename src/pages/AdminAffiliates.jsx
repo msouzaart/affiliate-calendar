@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { listUsers, listPosts, getUserTotalPoints, isAffiliateActive, manuallyAwardBadge } from '../lib/db';
+import { listUsers, listPosts, getUserTotalPoints, isAffiliateActive, manuallyAwardBadge, deleteAffiliate } from '../lib/db';
 import { PUBLISHED_STATUSES, PLATFORMS, STATUSES, PERIODS } from '../lib/constants';
 import { startOfWeek, startOfMonth } from '../lib/points';
 import EmptyState from '../components/ui/EmptyState';
@@ -27,6 +27,8 @@ export default function AdminAffiliates() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [deletingId, setDeletingId] = useState(null);
+  const [error, setError] = useState('');
 
   const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
 
@@ -63,6 +65,23 @@ export default function AdminAffiliates() {
     reload();
   };
 
+  const handleDelete = async (affiliate) => {
+    const confirmed = window.confirm(
+      `Delete ${affiliate.name}? This removes their profile, posts, points, and badges from the app. This can't be undone.`
+    );
+    if (!confirmed) return;
+    setError('');
+    setDeletingId(affiliate.id);
+    try {
+      await deleteAffiliate(affiliate.id);
+      reload();
+    } catch (e) {
+      setError(e?.message || `Could not delete ${affiliate.name}. Please try again.`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="screen">
       <h1>Affiliates</h1>
@@ -81,6 +100,8 @@ export default function AdminAffiliates() {
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
+
+      {error && <div className="chip chip-amber" style={{ marginBottom: 10 }}>{error}</div>}
 
       {loading ? (
         <p className="muted">Loading…</p>
@@ -118,9 +139,17 @@ export default function AdminAffiliates() {
                       {r.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td>
+                  <td style={{ display: 'flex', gap: 6 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => award(r.affiliate.id)}>
                       🏅 Award
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--coral)' }}
+                      disabled={deletingId === r.affiliate.id}
+                      onClick={() => handleDelete(r.affiliate)}
+                    >
+                      {deletingId === r.affiliate.id ? 'Deleting…' : '🗑 Delete'}
                     </button>
                   </td>
                 </tr>

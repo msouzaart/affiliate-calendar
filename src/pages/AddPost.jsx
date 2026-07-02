@@ -11,6 +11,7 @@ const emptyForm = {
   date: new Date().toISOString().slice(0, 10),
   status: 'Planned',
   post_link: '',
+  reference_link: '',
   reported_views: '',
   reported_likes: '',
   reported_comments: '',
@@ -56,6 +57,7 @@ export default function AddPost({ editMode }) {
             platform: idea.suggested_platform,
             content_type: idea.suggested_content_type,
             notes: `Hook: ${idea.hook}\nCTA: ${idea.cta}`,
+            reference_link: idea.reference_video_url || '',
             idea_id: idea.id,
           });
         }
@@ -125,8 +127,16 @@ export default function AddPost({ editMode }) {
           </div>
         </div>
 
+        <label className="field-label">Reference link (optional)</label>
+        <input
+          className="input" type="url" value={form.reference_link} onChange={update('reference_link')}
+          placeholder="Link to inspiration, an idea's reference video, or your draft"
+        />
+        <div className="field-note">Just for planning — not shown as the live post.</div>
+
         <label className="field-label">Post link</label>
         <input className="input" type="url" value={form.post_link} onChange={update('post_link')} placeholder="https://instagram.com/p/..." />
+        <div className="field-note">The actual published post — add this once it's live.</div>
 
         <button type="button" className="collapse-toggle" onClick={() => setShowResults((s) => !s)}>
           {showResults ? '− Hide reported results & feedback' : '+ Add reported results & feedback (optional)'}

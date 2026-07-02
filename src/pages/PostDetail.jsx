@@ -104,6 +104,9 @@ export default function PostDetail() {
         {post.post_link && (
           <a className="post-link" href={post.post_link} target="_blank" rel="noreferrer">View live post ↗</a>
         )}
+        {post.reference_link && (
+          <a className="post-link" href={post.reference_link} target="_blank" rel="noreferrer">View reference link ↗</a>
+        )}
         <div className="post-points">+{post.points || 0} pts earned from this post</div>
       </section>
 

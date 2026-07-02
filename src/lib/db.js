@@ -104,6 +104,28 @@ export async function toggleSavedIdea(userId, ideaId) {
   await updateDoc(doc(firestore, 'profiles', userId), { saved_idea_ids: next });
 }
 
+// Removes an affiliate's profile plus all their posts, points, and badges.
+// NOTE: this cannot delete their Firebase Authentication login — the client
+// SDK can only delete the currently signed-in user's own account. The person
+// deleted here will lose all app access (no profile = sign-in rejected), but
+// their login technically still exists until removed manually in the
+// Firebase console (Authentication → Users).
+export async function deleteAffiliate(userId) {
+  const posts = await listPosts({ userId });
+  for (const p of posts) {
+    await deletePost(p.id);
+  }
+  const remainingPoints = await listPoints({ userId });
+  for (const pt of remainingPoints) {
+    await deleteDoc(doc(firestore, 'points', pt.id));
+  }
+  const badges = await listBadges({ userId });
+  for (const b of badges) {
+    await deleteDoc(doc(firestore, 'badges', b.id));
+  }
+  await deleteDoc(doc(firestore, 'profiles', userId));
+}
+
 // ---------------------------------------------------------------------------
 // Posts
 // ---------------------------------------------------------------------------
@@ -227,6 +249,7 @@ export async function createPost(userId, data) {
     date: data.date || now.slice(0, 10),
     status: data.status || 'Planned',
     post_link: data.post_link || '',
+    reference_link: data.reference_link || '',
     reported_views: data.reported_views ?? '',
     reported_likes: data.reported_likes ?? '',
     reported_comments: data.reported_comments ?? '',

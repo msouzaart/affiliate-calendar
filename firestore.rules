@@ -31,14 +31,14 @@ service cloud.firestore {
     // Profiles are readable by any signed-in program member — needed for the
     // leaderboard, admin views, and showing names on posts. Only the owner
     // can create/update their own profile (or an admin can update anyone's).
-    // Only one admin account may ever be created (enforced here, not just in
-    // the UI).
+    // Only one admin account may ever be created. Admins can delete an
+    // affiliate's profile (removes their app access).
     match /profiles/{userId} {
       allow read: if isSignedIn();
       allow create: if isOwner(userId) &&
         (request.resource.data.role != 'admin' || !adminAlreadyExists());
       allow update: if isOwner(userId) || isAdmin();
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     // Readable by anyone signed in; only admins can add/edit the idea library.
@@ -56,18 +56,21 @@ service cloud.firestore {
     }
 
     // Points ledger — readable by any signed-in member (leaderboard totals);
-    // written automatically by the app, never edited after the fact.
+    // written automatically by the app. Never editable; only admins can
+    // delete (used when removing an affiliate's data).
     match /points/{pointId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid || isAdmin());
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     // Badges earned — same pattern as points.
     match /badges/{badgeId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid || isAdmin());
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin();
     }
   }
 }

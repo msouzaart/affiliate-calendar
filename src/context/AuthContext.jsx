@@ -5,7 +5,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../lib/firebaseClient';
 import {
-  getUser, createProfile, touchUserActive, updateUser,
+  getUser, createProfile, touchUserActive,
   checkAdminExists, markAdminCreated,
 } from '../lib/db';
 
@@ -47,12 +47,11 @@ export function AuthProvider({ children }) {
 
   const logout = () => signOut(auth);
 
-  const signUpAffiliateUser = async ({ name, email, username, password }) => {
+  const signUpAffiliateUser = async ({ name, email, password }) => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const profile = await createProfile(cred.user.uid, { name, email, role: 'affiliate' });
-      if (username) await updateUser(cred.user.uid, { username });
-      setCurrentUser({ ...profile, username });
+      setCurrentUser(profile);
       return { user: profile };
     } catch (error) {
       return { error: friendlyAuthError(error) };

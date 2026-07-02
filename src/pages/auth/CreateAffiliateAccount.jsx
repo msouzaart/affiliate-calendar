@@ -5,7 +5,7 @@ import { APP_NAME } from '../../lib/config';
 
 export default function CreateAffiliateAccount({ onGoAffiliateSignIn, onGoAdminSignIn }) {
   const { signUpAffiliateUser } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', username: '', password: '', confirm: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
@@ -16,7 +16,7 @@ export default function CreateAffiliateAccount({ onGoAffiliateSignIn, onGoAdminS
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.name.trim() || !form.email.trim() || !form.username.trim() || !form.password) {
+    if (!form.name.trim() || !form.email.trim() || !form.password) {
       setError('Please fill in every field.');
       return;
     }
@@ -30,7 +30,7 @@ export default function CreateAffiliateAccount({ onGoAffiliateSignIn, onGoAdminS
     }
     setSubmitting(true);
     const result = await signUpAffiliateUser({
-      name: form.name, email: form.email, username: form.username, password: form.password,
+      name: form.name, email: form.email, password: form.password,
     });
     setSubmitting(false);
     if (result.error) setError(result.error);
@@ -55,9 +55,7 @@ export default function CreateAffiliateAccount({ onGoAffiliateSignIn, onGoAdminS
 
           <label className="field-label">Email</label>
           <input className="input" type="email" value={form.email} onChange={update('email')} placeholder="Enter your email address" />
-
-          <label className="field-label">Username</label>
-          <input className="input" value={form.username} onChange={update('username')} placeholder="Choose a username" />
+          <div className="field-note">This is what you'll use to sign in — no confirmation email is sent.</div>
 
           <label className="field-label">Password</label>
           <div className="input-icon-wrap">

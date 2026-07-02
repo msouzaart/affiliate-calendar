@@ -1,4 +1,4 @@
-# Deploy guide (your own GitHub + Vercel)
+# Deploy guide (your own GitHub + Vercel + Firebase)
 
 Run these from a terminal in `affiliate-calendar` on your computer (same folder where
 `npm run dev` already works). This publishes the app under **your own accounts**, not
@@ -29,7 +29,19 @@ git push -u origin main
 2. Click "Import" next to the `affiliate-calendar` repo
 3. Vercel auto-detects **Vite** — Build Command `npm run build`, Output Directory `dist`
    should already be filled in correctly. Leave them as is.
-4. Click **Deploy** and wait ~1 minute.
+4. **Before clicking Deploy**, open "Environment Variables" and add these six (copy the
+   values from your local `.env.local` file — never commit that file to Git):
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
+5. Click **Deploy** and wait ~1 minute.
+
+If you already deployed once before adding these variables, go to Project → Settings →
+Environment Variables, add them there, then Project → Deployments → "..." on the latest
+deployment → Redeploy.
 
 You'll get a live URL like `https://affiliate-calendar-yourname.vercel.app` — that works
 from any phone, anywhere, over HTTPS (required for the "install as app" PWA prompt).
@@ -54,9 +66,13 @@ Vercel redeploys automatically a few seconds after every push — no extra steps
 
 ## Notes
 
-- Data is stored in each visitor's browser (`localStorage`), so every affiliate sees
-  their own local data, not a shared database. That's expected for this MVP — see the
-  README's "Swapping in real Supabase later" section for the upgrade path to a shared
-  backend everyone reads/writes to.
+- Data lives in a real, shared Firebase project (Firestore + Authentication) — every
+  affiliate and the admin read and write the same database, from any device.
+- Never commit `.env.local` — it holds your Firebase project's public config keys.
+  It's already in `.gitignore`. Anyone deploying a copy of this app needs their own
+  `.env.local` locally and the same six variables set in their own Vercel project.
+- Firestore security rules live in `firestore.rules` — if you ever change the data
+  model, update that file and redeploy the rules from the Firebase console
+  (Firestore → Rules → paste → Publish).
 - Custom domain: once deployed, Vercel → Project → Settings → Domains lets you attach
   your own domain instead of the `*.vercel.app` one.

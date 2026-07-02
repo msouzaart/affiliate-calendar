@@ -1,5 +1,5 @@
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useDataVersion } from '../context/DataContext';
 import { getPost, updatePost, duplicatePostAsNew, duplicatePostAsIdea } from '../lib/db';
 import StatusChip from '../components/ui/StatusChip';
 import EmptyState from '../components/ui/EmptyState';
@@ -14,10 +14,48 @@ const RESULT_FIELDS = [
 ];
 
 export default function PostDetail() {
-  useDataVersion();
   const { id } = useParams();
   const navigate = useNavigate();
-  const post = getPost(id);
+  const [post, setPost] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    getPost(id).then((p) => {
+      if (alive) { setPost(p); setLoading(false); }
+    });
+    return () => { alive = false; };
+  }, [id, refreshTick]);
+
+  const changeStatus = async (status) => {
+    setBusy(true);
+    await updatePost(post.id, { status });
+    setBusy(false);
+    reload();
+  };
+
+  const asNewPost = async () => {
+    setBusy(true);
+    const copy = await duplicatePostAsNew(post.id);
+    setBusy(false);
+    navigate(`/post/${copy.id}/edit`);
+  };
+
+  const asIdea = async () => {
+    setBusy(true);
+    await duplicatePostAsIdea(post.id);
+    setBusy(false);
+    navigate('/ideas');
+  };
+
+  if (loading) {
+    return <div className="screen"><p className="muted">Loading…</p></div>;
+  }
 
   if (!post) {
     return (
@@ -76,29 +114,23 @@ export default function PostDetail() {
       )}
 
       <section className="card action-list">
-        <button className="btn btn-primary btn-block" onClick={() => navigate(`/post/${post.id}/edit`, { state: { focusResults: true } })}>
+        <button className="btn btn-primary btn-block" disabled={busy} onClick={() => navigate(`/post/${post.id}/edit`, { state: { focusResults: true } })}>
           Update results
         </button>
         {post.status === 'Planned' && (
-          <button className="btn btn-secondary btn-block" onClick={() => updatePost(post.id, { status: 'Posted' })}>
+          <button className="btn btn-secondary btn-block" disabled={busy} onClick={() => changeStatus('Posted')}>
             Mark as posted
           </button>
         )}
         {post.status !== 'Completed' && (
-          <button className="btn btn-secondary btn-block" onClick={() => updatePost(post.id, { status: 'Completed' })}>
+          <button className="btn btn-secondary btn-block" disabled={busy} onClick={() => changeStatus('Completed')}>
             Mark as completed
           </button>
         )}
-        <button className="btn btn-ghost btn-block" onClick={() => {
-          const copy = duplicatePostAsNew(post.id);
-          navigate(`/post/${copy.id}/edit`);
-        }}>
+        <button className="btn btn-ghost btn-block" disabled={busy} onClick={asNewPost}>
           Duplicate as new post
         </button>
-        <button className="btn btn-ghost btn-block" onClick={() => {
-          duplicatePostAsIdea(post.id);
-          navigate('/ideas');
-        }}>
+        <button className="btn btn-ghost btn-block" disabled={busy} onClick={asIdea}>
           Duplicate as idea
         </button>
       </section>

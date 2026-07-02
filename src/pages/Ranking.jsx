@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useDataVersion } from '../context/DataContext';
 import { getLeaderboard } from '../lib/db';
 import { RANKING_TABS, PERIODS } from '../lib/constants';
 import EmptyState from '../components/ui/EmptyState';
@@ -24,12 +23,21 @@ const METRIC_SUFFIX = {
 };
 
 export default function Ranking({ adminView = false }) {
-  useDataVersion();
   const { currentUser } = useAuth();
   const [metric, setMetric] = useState('overall');
   const [period, setPeriod] = useState('week');
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState([]);
 
-  const rows = getLeaderboard({ period, metric });
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    getLeaderboard({ period, metric }).then((r) => {
+      if (alive) { setRows(r); setLoading(false); }
+    });
+    return () => { alive = false; };
+  }, [period, metric]);
+
   const valueKey = METRIC_VALUE_KEY[metric];
   const myRow = !adminView && currentUser.role === 'affiliate' ? rows.find((r) => r.user.id === currentUser.id) : null;
   const periodLabel = PERIODS.find((p) => p.key === period)?.label;
@@ -63,7 +71,9 @@ export default function Ranking({ adminView = false }) {
         ))}
       </div>
 
-      {rows.length === 0 ? (
+      {loading ? (
+        <p className="muted">Loading…</p>
+      ) : rows.length === 0 ? (
         <EmptyState emoji="🏆" title="No affiliates yet" subtitle="Rankings will appear once affiliates start posting." />
       ) : (
         <div className="card leaderboard-card">

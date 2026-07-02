@@ -19,7 +19,15 @@ import AdminSettings from './pages/AdminSettings';
 import { APP_NAME } from './lib/config';
 
 export default function App() {
-  const { currentUser } = useAuth();
+  const { currentUser, authLoading } = useAuth();
+
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+        Loading…
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <AuthFlow />;

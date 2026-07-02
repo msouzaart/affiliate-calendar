@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useDataVersion } from '../context/DataContext';
 import { listPosts } from '../lib/db';
 import { PUBLISHED_STATUSES, STATUSES } from '../lib/constants';
 import { startOfWeek, startOfMonth } from '../lib/points';
@@ -28,13 +27,21 @@ function formatDateHeader(dateStr) {
 }
 
 export default function Calendar() {
-  useDataVersion();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState('list');
   const [statusFilter, setStatusFilter] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [allPosts, setAllPosts] = useState([]);
 
-  const allPosts = listPosts({ userId: currentUser.id });
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    listPosts({ userId: currentUser.id }).then((posts) => {
+      if (alive) { setAllPosts(posts); setLoading(false); }
+    });
+    return () => { alive = false; };
+  }, [currentUser.id]);
 
   const filtered = useMemo(() => {
     let posts = allPosts;

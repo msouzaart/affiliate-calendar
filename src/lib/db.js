@@ -1,90 +1,38 @@
-// Mock "Supabase-like" local data layer.
-// Schema mirrors the planned Supabase tables (users, posts, ideas, points, badges)
-// so this module can be swapped for real Supabase calls later without touching
-// the UI layer — every function here returns plain objects/arrays.
+// Firestore-backed data layer.
+// Collections: profiles, posts, ideas, points, badges (see /firestore.rules for
+// the matching security rules). Every function here is async and talks to a
+// real, shared Firebase project — there is no local/mock fallback anymore.
 
-import { buildSeedIdeas } from './seedIdeas';
+import {
+  collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
+  query, where, onSnapshot,
+} from 'firebase/firestore';
+import { db as firestore } from './firebaseClient';
 import { diffPostForPoints, startOfWeek, startOfMonth, weekKey, POINT_VALUES } from './points';
 import { PUBLISHED_STATUSES } from './constants';
-import { DEFAULT_ADMIN_NAME, DEFAULT_ADMIN_EMAIL } from './config';
 
-const STORAGE_KEY = 'affiliate_calendar_db_v1';
-const listeners = new Set();
-
-function uid(prefix) {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function defaultDB() {
-  const now = new Date().toISOString();
-  return {
-    users: [
-      {
-        id: 'admin_default',
-        name: DEFAULT_ADMIN_NAME,
-        email: DEFAULT_ADMIN_EMAIL,
-        role: 'admin',
-        affiliate_code: null,
-        avatar_url: null,
-        username: null,
-        password: null, // set on first admin sign-in — mock only, not real security
-        saved_idea_ids: [],
-        created_at: now,
-        last_active_at: now,
-      },
-    ],
-    posts: [],
-    ideas: buildSeedIdeas(),
-    points: [],
-    badges: [],
-  };
-}
-
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const fresh = defaultDB();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-      return fresh;
-    }
-    const parsed = JSON.parse(raw);
-    // Backfill in case of older shape / missing keys
-    return { ...defaultDB(), ...parsed, ideas: parsed.ideas?.length ? parsed.ideas : buildSeedIdeas() };
-  } catch (e) {
-    const fresh = defaultDB();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-    return fresh;
-  }
-}
-
-let DB = load();
-
-function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
-  listeners.forEach((cb) => cb());
-}
-
-export function subscribe(cb) {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
-}
-
-export function resetAllData() {
-  DB = defaultDB();
-  persist();
-}
+const col = (name) => collection(firestore, name);
+const docToObj = (d) => ({ id: d.id, ...d.data() });
 
 // ---------------------------------------------------------------------------
-// Users
+// Profiles (users)
 // ---------------------------------------------------------------------------
 
-export function listUsers({ role } = {}) {
-  return DB.users.filter((u) => (role ? u.role === role : true));
+export async function getUser(id) {
+  if (!id) return null;
+  const snap = await getDoc(doc(firestore, 'profiles', id));
+  return snap.exists() ? docToObj(snap) : null;
 }
 
-export function getUser(id) {
-  return DB.users.find((u) => u.id === id) || null;
+export async function listUsers({ role } = {}) {
+  const q = role ? query(col('profiles'), where('role', '==', role)) : col('profiles');
+  const snap = await getDocs(q);
+  return snap.docs.map(docToObj);
+}
+
+export function subscribeUsers({ role } = {}, callback) {
+  const q = role ? query(col('profiles'), where('role', '==', role)) : col('profiles');
+  return onSnapshot(q, (snap) => callback(snap.docs.map(docToObj)), () => callback([]));
 }
 
 function generateAffiliateCode(name) {
@@ -93,159 +41,88 @@ function generateAffiliateCode(name) {
   return `${base}${suffix}`;
 }
 
-export function createUser({ name, email, role = 'affiliate', username, password }) {
+export async function createProfile(uid, { name, email, role = 'affiliate' }) {
   const now = new Date().toISOString();
-  const user = {
-    id: uid('user'),
+  const profile = {
     name: name?.trim() || 'New Affiliate',
     email: email?.trim() || '',
     role,
     affiliate_code: role === 'affiliate' ? generateAffiliateCode(name) : null,
     avatar_url: null,
-    username: username?.trim() || null,
-    password: password || null, // mock only — plaintext, local device storage, not real security
     saved_idea_ids: [],
     created_at: now,
     last_active_at: now,
   };
-  DB.users.push(user);
-  persist();
-  return user;
+  await setDoc(doc(firestore, 'profiles', uid), profile);
+  return { id: uid, ...profile };
 }
 
-export function touchUserActive(id) {
-  const u = getUser(id);
-  if (!u) return;
-  u.last_active_at = new Date().toISOString();
-  persist();
-}
-
-export function updateUser(id, patch) {
-  const u = getUser(id);
-  if (!u) return null;
-  Object.assign(u, patch);
-  persist();
-  return u;
-}
-
-export function changeAdminPassword(oldPassword, newPassword) {
-  const admin = DB.users.find((u) => u.role === 'admin');
-  if (!admin) return { error: 'No admin account found.' };
-  if (admin.password && admin.password !== oldPassword) return { error: 'Current password is incorrect.' };
-  admin.password = newPassword;
-  persist();
-  return { user: admin };
-}
-
-// ---------------------------------------------------------------------------
-// Mock auth (local device only — no real backend/security)
-// ---------------------------------------------------------------------------
-
-function findByIdentifier(identifier, role) {
-  const needle = (identifier || '').trim().toLowerCase();
-  if (!needle) return null;
-  return (
-    DB.users.find(
-      (u) =>
-        u.role === role &&
-        ((u.email && u.email.toLowerCase() === needle) || (u.username && u.username.toLowerCase() === needle))
-    ) || null
-  );
-}
-
-export function isEmailOrUsernameTaken(identifier) {
-  const needle = (identifier || '').trim().toLowerCase();
-  if (!needle) return false;
-  return DB.users.some(
-    (u) => (u.email && u.email.toLowerCase() === needle) || (u.username && u.username.toLowerCase() === needle)
-  );
-}
-
-export function signUpAffiliate({ name, email, username, password }) {
-  if (isEmailOrUsernameTaken(email) || isEmailOrUsernameTaken(username)) {
-    return { error: 'That email or username is already in use.' };
+export async function touchUserActive(id) {
+  if (!id) return;
+  try {
+    await updateDoc(doc(firestore, 'profiles', id), { last_active_at: new Date().toISOString() });
+  } catch (e) {
+    /* ignore — best effort */
   }
-  const user = createUser({ name, email, role: 'affiliate', username, password });
-  return { user };
 }
 
-export function signInAffiliate({ identifier, password }) {
-  const user = findByIdentifier(identifier, 'affiliate');
-  if (!user) return { error: 'No affiliate found with that email or username.' };
-  if (!user.password) return { error: 'This account has no password set yet. Create a new account instead.' };
-  if (user.password !== password) return { error: 'Incorrect password.' };
-  return { user };
+export async function updateUser(id, patch) {
+  await updateDoc(doc(firestore, 'profiles', id), patch);
+  return getUser(id);
 }
 
-export function adminNeedsSetup() {
-  const admin = DB.users.find((u) => u.role === 'admin');
-  return !!admin && !admin.password;
-}
-
-export function setAdminPassword(password) {
-  const admin = DB.users.find((u) => u.role === 'admin');
-  if (!admin) return null;
-  admin.password = password;
-  persist();
-  return admin;
-}
-
-export function signInAdmin({ email, password }) {
-  const admin = DB.users.find((u) => u.role === 'admin');
-  if (!admin) return { error: 'No admin account found.' };
-  if (admin.email.toLowerCase() !== (email || '').trim().toLowerCase()) {
-    return { error: 'No admin found with that email.' };
-  }
-  if (!admin.password) return { error: 'Admin password has not been set up yet.' };
-  if (admin.password !== password) return { error: 'Incorrect password.' };
-  return { user: admin };
-}
-
-// ---------------------------------------------------------------------------
-// Saved ideas (bookmarks)
-// ---------------------------------------------------------------------------
-
-export function isIdeaSaved(userId, ideaId) {
-  const u = getUser(userId);
+export async function isIdeaSaved(userId, ideaId) {
+  const u = await getUser(userId);
   return !!u?.saved_idea_ids?.includes(ideaId);
 }
 
-export function toggleSavedIdea(userId, ideaId) {
-  const u = getUser(userId);
+export async function toggleSavedIdea(userId, ideaId) {
+  const u = await getUser(userId);
   if (!u) return;
-  if (!u.saved_idea_ids) u.saved_idea_ids = [];
-  if (u.saved_idea_ids.includes(ideaId)) {
-    u.saved_idea_ids = u.saved_idea_ids.filter((id) => id !== ideaId);
-  } else {
-    u.saved_idea_ids.push(ideaId);
-  }
-  persist();
+  const has = (u.saved_idea_ids || []).includes(ideaId);
+  const next = has
+    ? (u.saved_idea_ids || []).filter((id) => id !== ideaId)
+    : [...(u.saved_idea_ids || []), ideaId];
+  await updateDoc(doc(firestore, 'profiles', userId), { saved_idea_ids: next });
 }
 
 // ---------------------------------------------------------------------------
 // Posts
 // ---------------------------------------------------------------------------
 
-export function listPosts({ userId, platform, status, from, to } = {}) {
-  return DB.posts
-    .filter((p) => (userId ? p.user_id === userId : true))
-    .filter((p) => (platform ? p.platform === platform : true))
-    .filter((p) => (status ? p.status === status : true))
-    .filter((p) => (from ? p.date >= from : true))
-    .filter((p) => (to ? p.date <= to : true))
-    .sort((a, b) => (a.date < b.date ? 1 : -1));
+export async function listPosts({ userId, platform, status, from, to } = {}) {
+  const clauses = [];
+  if (userId) clauses.push(where('user_id', '==', userId));
+  if (platform) clauses.push(where('platform', '==', platform));
+  if (status) clauses.push(where('status', '==', status));
+  const q = clauses.length ? query(col('posts'), ...clauses) : col('posts');
+  const snap = await getDocs(q);
+  let posts = snap.docs.map(docToObj);
+  if (from) posts = posts.filter((p) => p.date >= from);
+  if (to) posts = posts.filter((p) => p.date <= to);
+  return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
-export function getPost(id) {
-  return DB.posts.find((p) => p.id === id) || null;
+export function subscribePosts({ userId } = {}, callback) {
+  const q = userId ? query(col('posts'), where('user_id', '==', userId)) : col('posts');
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(docToObj).sort((a, b) => (a.date < b.date ? 1 : -1))),
+    () => callback([])
+  );
 }
 
-function addPointEntry(userId, postId, action_type, points, periodKey) {
+export async function getPost(id) {
+  if (!id) return null;
+  const snap = await getDoc(doc(firestore, 'posts', id));
+  return snap.exists() ? docToObj(snap) : null;
+}
+
+async function addPointEntry(userId, postId, action_type, points, periodKey) {
   if (!points) return;
-  DB.points.push({
-    id: uid('pt'),
+  await addDoc(col('points'), {
     user_id: userId,
-    post_id: postId,
+    post_id: postId || null,
     action_type,
     points,
     period_key: periodKey || null,
@@ -253,38 +130,39 @@ function addPointEntry(userId, postId, action_type, points, periodKey) {
   });
 }
 
-function recomputePostPoints(post) {
-  post.points = DB.points
-    .filter((pt) => pt.post_id === post.id)
-    .reduce((sum, pt) => sum + pt.points, 0);
+async function recomputePostPoints(postId) {
+  const snap = await getDocs(query(col('points'), where('post_id', '==', postId)));
+  const total = snap.docs.reduce((sum, d) => sum + (d.data().points || 0), 0);
+  await updateDoc(doc(firestore, 'posts', postId), { points: total });
+  return total;
 }
 
-function maybeAwardWeeklyConsistencyBonus(userId) {
+async function maybeAwardWeeklyConsistencyBonus(userId) {
   const wk = weekKey(new Date());
-  const already = DB.points.some(
-    (pt) => pt.user_id === userId && pt.action_type === 'consistency_bonus_week' && pt.period_key === wk
+  const existing = await getDocs(
+    query(col('points'), where('user_id', '==', userId), where('action_type', '==', 'consistency_bonus_week'))
   );
-  if (already) return;
+  if (existing.docs.some((d) => d.data().period_key === wk)) return;
+
   const start = startOfWeek(new Date());
-  const postedThisWeek = DB.posts.filter(
-    (p) =>
-      p.user_id === userId &&
-      PUBLISHED_STATUSES.includes(p.status) &&
-      new Date(p.date) >= start
+  const posts = await listPosts({ userId });
+  const postedThisWeek = posts.filter(
+    (p) => PUBLISHED_STATUSES.includes(p.status) && new Date(p.date) >= start
   ).length;
   if (postedThisWeek >= 3) {
-    addPointEntry(userId, null, 'consistency_bonus_week', POINT_VALUES.consistency_bonus_week, wk);
+    await addPointEntry(userId, null, 'consistency_bonus_week', POINT_VALUES.consistency_bonus_week, wk);
   }
 }
 
-function maybeAwardFourWeekBadge(userId) {
-  const already = DB.badges.some((b) => b.user_id === userId && b.badge_name === 'Consistent Creator');
-  if (already) return;
-  // Check the last 4 ISO week buckets each have at least one published post.
+async function maybeAwardFourWeekBadge(userId) {
+  const existing = await getDocs(
+    query(col('badges'), where('user_id', '==', userId), where('badge_name', '==', 'Consistent Creator'))
+  );
+  if (existing.docs.length > 0) return;
+
+  const posts = await listPosts({ userId });
   const weeksWithPost = new Set(
-    DB.posts
-      .filter((p) => p.user_id === userId && PUBLISHED_STATUSES.includes(p.status))
-      .map((p) => weekKey(p.date))
+    posts.filter((p) => PUBLISHED_STATUSES.includes(p.status)).map((p) => weekKey(p.date))
   );
   const now = new Date();
   let streak = 0;
@@ -299,32 +177,31 @@ function maybeAwardFourWeekBadge(userId) {
     }
   }
   if (streak >= 4) {
-    awardBadge(userId, 'Consistent Creator');
-    addPointEntry(userId, null, 'consistency_badge_4weeks', POINT_VALUES.consistency_badge_4weeks, 'badge');
+    await awardBadge(userId, 'Consistent Creator');
+    await addPointEntry(userId, null, 'consistency_badge_4weeks', POINT_VALUES.consistency_badge_4weeks, 'badge');
   }
 }
 
-function checkAutoBadges(userId) {
-  const posts = DB.posts.filter((p) => p.user_id === userId);
+async function checkAutoBadges(userId) {
+  const posts = await listPosts({ userId });
   const published = posts.filter((p) => PUBLISHED_STATUSES.includes(p.status));
-  if (published.length >= 1) awardBadge(userId, 'First Post');
+  if (published.length >= 1) await awardBadge(userId, 'First Post');
 
   const feedbackCount = posts.filter((p) => p.feedback && p.feedback.trim()).length;
-  if (feedbackCount >= 10) awardBadge(userId, 'Feedback Hero');
+  if (feedbackCount >= 10) await awardBadge(userId, 'Feedback Hero');
 
   const totalLeads = posts.reduce((sum, p) => sum + (Number(p.reported_leads) || 0), 0);
-  if (totalLeads >= 1) awardBadge(userId, 'Lead Starter');
+  if (totalLeads >= 1) await awardBadge(userId, 'Lead Starter');
 
   const totalSales = posts.reduce((sum, p) => sum + (Number(p.reported_sales) || 0), 0);
-  if (totalSales >= 1) awardBadge(userId, 'First Sale');
+  if (totalSales >= 1) await awardBadge(userId, 'First Sale');
 
-  maybeAwardFourWeekBadge(userId);
+  await maybeAwardFourWeekBadge(userId);
 }
 
-export function createPost(userId, data) {
+export async function createPost(userId, data) {
   const now = new Date().toISOString();
   const post = {
-    id: uid('post'),
     user_id: userId,
     title: data.title?.trim() || 'Untitled post',
     platform: data.platform || 'Instagram',
@@ -342,52 +219,47 @@ export function createPost(userId, data) {
     notes: data.notes || '',
     idea_id: data.idea_id || null,
     points: 0,
-    _awarded: [],
     created_at: now,
     updated_at: now,
   };
-  DB.posts.push(post);
+  const ref = await addDoc(col('posts'), post);
 
-  const { events, awarded } = diffPostForPoints(null, post);
-  events.forEach((e) => addPointEntry(userId, post.id, e.action_type, e.points));
-  post._awarded = awarded;
-  recomputePostPoints(post);
+  const { events } = diffPostForPoints(null, post);
+  for (const e of events) await addPointEntry(userId, ref.id, e.action_type, e.points);
+  await recomputePostPoints(ref.id);
 
-  maybeAwardWeeklyConsistencyBonus(userId);
-  checkAutoBadges(userId);
-  touchUserActive(userId);
-  persist();
-  return post;
+  await maybeAwardWeeklyConsistencyBonus(userId);
+  await checkAutoBadges(userId);
+  await touchUserActive(userId);
+  return getPost(ref.id);
 }
 
-export function updatePost(id, patch) {
-  const post = getPost(id);
-  if (!post) return null;
-  const prevSnapshot = { ...post };
-  const next = { ...post, ...patch, updated_at: new Date().toISOString() };
+export async function updatePost(id, patch) {
+  const prev = await getPost(id);
+  if (!prev) return null;
+  const next = { ...prev, ...patch, updated_at: new Date().toISOString() };
+  delete next.id;
 
-  const { events, awarded } = diffPostForPoints(prevSnapshot, next);
-  events.forEach((e) => addPointEntry(next.user_id, next.id, e.action_type, e.points));
-  next._awarded = awarded;
+  const { events } = diffPostForPoints(prev, next);
+  for (const e of events) await addPointEntry(next.user_id, id, e.action_type, e.points);
 
-  Object.assign(post, next);
-  recomputePostPoints(post);
+  await updateDoc(doc(firestore, 'posts', id), next);
+  await recomputePostPoints(id);
 
-  maybeAwardWeeklyConsistencyBonus(post.user_id);
-  checkAutoBadges(post.user_id);
-  touchUserActive(post.user_id);
-  persist();
-  return post;
+  await maybeAwardWeeklyConsistencyBonus(next.user_id);
+  await checkAutoBadges(next.user_id);
+  await touchUserActive(next.user_id);
+  return getPost(id);
 }
 
-export function deletePost(id) {
-  DB.posts = DB.posts.filter((p) => p.id !== id);
-  DB.points = DB.points.filter((pt) => pt.post_id !== id);
-  persist();
+export async function deletePost(id) {
+  const pointsSnap = await getDocs(query(col('points'), where('post_id', '==', id)));
+  await Promise.all(pointsSnap.docs.map((d) => deleteDoc(d.ref)));
+  await deleteDoc(doc(firestore, 'posts', id));
 }
 
-export function duplicatePostAsNew(id, overrides = {}) {
-  const original = getPost(id);
+export async function duplicatePostAsNew(id, overrides = {}) {
+  const original = await getPost(id);
   if (!original) return null;
   return createPost(original.user_id, {
     title: `${original.title} (copy)`,
@@ -400,8 +272,8 @@ export function duplicatePostAsNew(id, overrides = {}) {
   });
 }
 
-export function duplicatePostAsIdea(id) {
-  const original = getPost(id);
+export async function duplicatePostAsIdea(id) {
+  const original = await getPost(id);
   if (!original) return null;
   return createIdea({
     title: original.title,
@@ -419,19 +291,26 @@ export function duplicatePostAsIdea(id) {
 // Ideas
 // ---------------------------------------------------------------------------
 
-export function listIdeas({ category, activeOnly = true } = {}) {
-  return DB.ideas
-    .filter((i) => (activeOnly ? i.is_active : true))
+export async function listIdeas({ category, activeOnly = true } = {}) {
+  const snap = await getDocs(col('ideas'));
+  return snap.docs
+    .map(docToObj)
+    .filter((i) => (activeOnly ? i.is_active !== false : true))
     .filter((i) => (category ? i.category === category : true));
 }
 
-export function getIdea(id) {
-  return DB.ideas.find((i) => i.id === id) || null;
+export function subscribeIdeas(callback) {
+  return onSnapshot(col('ideas'), (snap) => callback(snap.docs.map(docToObj)), () => callback([]));
 }
 
-export function createIdea(data) {
+export async function getIdea(id) {
+  if (!id) return null;
+  const snap = await getDoc(doc(firestore, 'ideas', id));
+  return snap.exists() ? docToObj(snap) : null;
+}
+
+export async function createIdea(data) {
   const idea = {
-    id: uid('idea'),
     title: data.title,
     category: data.category,
     suggested_platform: data.suggested_platform,
@@ -450,49 +329,51 @@ export function createIdea(data) {
     best_time_to_post: data.best_time_to_post || '',
     created_at: new Date().toISOString(),
   };
-  DB.ideas.unshift(idea);
-  persist();
-  return idea;
+  const ref = await addDoc(col('ideas'), idea);
+  return { id: ref.id, ...idea };
 }
 
-export function incrementIdeaUsage(id) {
-  const idea = getIdea(id);
+export async function incrementIdeaUsage(id) {
+  const idea = await getIdea(id);
   if (!idea) return;
-  idea.used_count = (idea.used_count || 0) + 1;
-  persist();
+  await updateDoc(doc(firestore, 'ideas', id), { used_count: (idea.used_count || 0) + 1 });
 }
 
 // ---------------------------------------------------------------------------
 // Points & Badges
 // ---------------------------------------------------------------------------
 
-export function listPoints({ userId } = {}) {
-  return DB.points.filter((pt) => (userId ? pt.user_id === userId : true));
+export async function listPoints({ userId } = {}) {
+  const q = userId ? query(col('points'), where('user_id', '==', userId)) : col('points');
+  const snap = await getDocs(q);
+  return snap.docs.map(docToObj);
 }
 
-export function getUserTotalPoints(userId, { since } = {}) {
-  return DB.points
-    .filter((pt) => pt.user_id === userId)
+export async function getUserTotalPoints(userId, { since } = {}) {
+  const points = await listPoints({ userId });
+  return points
     .filter((pt) => (since ? new Date(pt.created_at) >= since : true))
     .reduce((sum, pt) => sum + pt.points, 0);
 }
 
-export function listBadges({ userId } = {}) {
-  return DB.badges.filter((b) => (userId ? b.user_id === userId : true));
+export async function listBadges({ userId } = {}) {
+  const q = userId ? query(col('badges'), where('user_id', '==', userId)) : col('badges');
+  const snap = await getDocs(q);
+  return snap.docs.map(docToObj);
 }
 
-export function awardBadge(userId, badgeName) {
-  const exists = DB.badges.some((b) => b.user_id === userId && b.badge_name === badgeName);
-  if (exists) return null;
-  const badge = { id: uid('badge'), user_id: userId, badge_name: badgeName, earned_at: new Date().toISOString() };
-  DB.badges.push(badge);
-  return badge;
+export async function awardBadge(userId, badgeName) {
+  const existing = await getDocs(
+    query(col('badges'), where('user_id', '==', userId), where('badge_name', '==', badgeName))
+  );
+  if (existing.docs.length > 0) return null;
+  const badge = { user_id: userId, badge_name: badgeName, earned_at: new Date().toISOString() };
+  const ref = await addDoc(col('badges'), badge);
+  return { id: ref.id, ...badge };
 }
 
-export function manuallyAwardBadge(userId, badgeName) {
-  const badge = awardBadge(userId, badgeName);
-  persist();
-  return badge;
+export async function manuallyAwardBadge(userId, badgeName) {
+  return awardBadge(userId, badgeName);
 }
 
 // ---------------------------------------------------------------------------
@@ -506,19 +387,18 @@ function periodStart(period) {
   return null; // all time
 }
 
-export function getAffiliateStats(userId, period = 'all') {
+export async function getAffiliateStats(userId, period = 'all') {
   const start = periodStart(period);
-  const posts = DB.posts.filter((p) => p.user_id === userId).filter((p) => (start ? new Date(p.date) >= start : true));
+  const allPosts = await listPosts({ userId });
+  const posts = allPosts.filter((p) => (start ? new Date(p.date) >= start : true));
   const published = posts.filter((p) => PUBLISHED_STATUSES.includes(p.status));
   const feedback = posts.filter((p) => p.feedback && p.feedback.trim()).length;
   const leads = posts.reduce((sum, p) => sum + (Number(p.reported_leads) || 0), 0);
   const sales = posts.reduce((sum, p) => sum + (Number(p.reported_sales) || 0), 0);
-  const points = getUserTotalPoints(userId, { since: start || undefined });
+  const points = await getUserTotalPoints(userId, { since: start || undefined });
 
   const weeksWithPost = new Set(
-    DB.posts
-      .filter((p) => p.user_id === userId && PUBLISHED_STATUSES.includes(p.status))
-      .map((p) => weekKey(p.date))
+    allPosts.filter((p) => PUBLISHED_STATUSES.includes(p.status)).map((p) => weekKey(p.date))
   );
   let consistency = 0;
   const now = new Date();
@@ -539,12 +419,14 @@ export function getAffiliateStats(userId, period = 'all') {
   };
 }
 
-export function getLeaderboard({ period = 'week', metric = 'overall' } = {}) {
-  const affiliates = listUsers({ role: 'affiliate' });
-  const rows = affiliates.map((u) => {
-    const stats = getAffiliateStats(u.id, period);
-    return { user: u, ...stats };
-  });
+export async function getLeaderboard({ period = 'week', metric = 'overall' } = {}) {
+  const affiliates = await listUsers({ role: 'affiliate' });
+  const rows = await Promise.all(
+    affiliates.map(async (u) => {
+      const stats = await getAffiliateStats(u.id, period);
+      return { user: u, ...stats };
+    })
+  );
 
   const sortKey = {
     overall: 'points',
@@ -564,8 +446,9 @@ export function getLeaderboard({ period = 'week', metric = 'overall' } = {}) {
 // Admin helpers
 // ---------------------------------------------------------------------------
 
-export function getPostsNeedingReview() {
-  return DB.posts.filter(
+export async function getPostsNeedingReview() {
+  const posts = await listPosts({});
+  return posts.filter(
     (p) =>
       PUBLISHED_STATUSES.includes(p.status) &&
       !p.feedback &&
@@ -573,19 +456,21 @@ export function getPostsNeedingReview() {
   );
 }
 
-export function getBestFeedback(limit = 5) {
-  return DB.posts
+export async function getBestFeedback(limit = 5) {
+  const posts = await listPosts({});
+  return posts
     .filter((p) => p.feedback && p.feedback.trim())
     .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
     .slice(0, limit);
 }
 
-export function getBestPerformingIdeas(limit = 5) {
-  return [...DB.ideas].sort((a, b) => (b.used_count || 0) - (a.used_count || 0)).slice(0, limit);
+export async function getBestPerformingIdeas(limit = 5) {
+  const ideas = await listIdeas({});
+  return [...ideas].sort((a, b) => (b.used_count || 0) - (a.used_count || 0)).slice(0, limit);
 }
 
-export function isAffiliateActive(userId, days = 7) {
-  const u = getUser(userId);
+export async function isAffiliateActive(userId, days = 7) {
+  const u = await getUser(userId);
   if (!u || !u.last_active_at) return false;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);

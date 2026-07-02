@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useDataVersion } from '../context/DataContext';
-import { listUsers, listPosts, getUser } from '../lib/db';
+import { useEffect, useState } from 'react';
+import { listUsers, listPosts } from '../lib/db';
 import { PLATFORMS, STATUSES, PERIODS } from '../lib/constants';
 import { startOfWeek, startOfMonth } from '../lib/points';
 import StatusChip from '../components/ui/StatusChip';
@@ -13,24 +12,38 @@ function periodStart(period) {
 }
 
 export default function AdminPosts() {
-  useDataVersion();
   const [period, setPeriod] = useState('all');
   const [affiliateId, setAffiliateId] = useState('');
   const [platform, setPlatform] = useState('');
   const [status, setStatus] = useState('');
 
-  const affiliates = listUsers({ role: 'affiliate' });
-  const start = periodStart(period);
-  const fromISO = start ? start.toISOString().slice(0, 10) : undefined;
+  const [loading, setLoading] = useState(true);
+  const [affiliates, setAffiliates] = useState([]);
+  const [posts, setPosts] = useState([]);
 
-  const posts = useMemo(() => {
-    return listPosts({
+  useEffect(() => {
+    let alive = true;
+    listUsers({ role: 'affiliate' }).then((affs) => { if (alive) setAffiliates(affs); });
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    const start = periodStart(period);
+    const fromISO = start ? start.toISOString().slice(0, 10) : undefined;
+    listPosts({
       userId: affiliateId || undefined,
       platform: platform || undefined,
       status: status || undefined,
       from: fromISO,
+    }).then((p) => {
+      if (alive) { setPosts(p); setLoading(false); }
     });
-  }, [affiliateId, platform, status, fromISO]);
+    return () => { alive = false; };
+  }, [affiliateId, platform, status, period]);
+
+  const nameById = new Map(affiliates.map((a) => [a.id, a.name]));
 
   return (
     <div className="screen">
@@ -54,7 +67,9 @@ export default function AdminPosts() {
         </select>
       </div>
 
-      {posts.length === 0 ? (
+      {loading ? (
+        <p className="muted">Loading…</p>
+      ) : posts.length === 0 ? (
         <EmptyState emoji="📝" title="No posts match these filters" />
       ) : (
         <div className="table-wrap card">
@@ -66,23 +81,20 @@ export default function AdminPosts() {
               </tr>
             </thead>
             <tbody>
-              {posts.map((p) => {
-                const owner = getUser(p.user_id);
-                return (
-                  <tr key={p.id}>
-                    <td>{owner?.name || '—'}</td>
-                    <td>{p.title}</td>
-                    <td>{p.platform}</td>
-                    <td>{p.content_type}</td>
-                    <td>{p.date}</td>
-                    <td><StatusChip status={p.status} /></td>
-                    <td>{p.reported_leads || 0}</td>
-                    <td>{p.reported_sales || 0}</td>
-                    <td>{p.feedback ? '✓' : '—'}</td>
-                    <td>{p.points || 0}</td>
-                  </tr>
-                );
-              })}
+              {posts.map((p) => (
+                <tr key={p.id}>
+                  <td>{nameById.get(p.user_id) || '—'}</td>
+                  <td>{p.title}</td>
+                  <td>{p.platform}</td>
+                  <td>{p.content_type}</td>
+                  <td>{p.date}</td>
+                  <td><StatusChip status={p.status} /></td>
+                  <td>{p.reported_leads || 0}</td>
+                  <td>{p.reported_sales || 0}</td>
+                  <td>{p.feedback ? '✓' : '—'}</td>
+                  <td>{p.points || 0}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

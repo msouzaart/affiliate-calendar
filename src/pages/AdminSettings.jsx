@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useDataVersion } from '../context/DataContext';
-import { changeAdminPassword } from '../lib/db';
 import { APP_NAME, APP_DESCRIPTOR, PROGRAM_NAME } from '../lib/config';
 
 export default function AdminSettings() {
-  useDataVersion();
-  const { currentUser } = useAuth();
+  const { currentUser, changeOwnPassword } = useAuth();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [message, setMessage] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
-    if (newPassword.length < 4) return setMessage({ type: 'error', text: 'New password must be at least 4 characters.' });
+    if (newPassword.length < 6) return setMessage({ type: 'error', text: 'New password must be at least 6 characters.' });
     if (newPassword !== confirm) return setMessage({ type: 'error', text: 'New passwords do not match.' });
-    const result = changeAdminPassword(oldPassword, newPassword);
+    setSubmitting(true);
+    const result = await changeOwnPassword({ currentPassword: oldPassword, newPassword });
+    setSubmitting(false);
     if (result.error) setMessage({ type: 'error', text: result.error });
     else {
       setMessage({ type: 'success', text: 'Password updated.' });
@@ -59,7 +59,9 @@ export default function AdminSettings() {
               {message.text}
             </div>
           )}
-          <button type="submit" className="btn btn-navy">Update password</button>
+          <button type="submit" className="btn btn-navy" disabled={submitting}>
+            {submitting ? 'Updating…' : 'Update password'}
+          </button>
         </form>
       </section>
     </div>

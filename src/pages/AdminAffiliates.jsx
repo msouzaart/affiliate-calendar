@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { useDataVersion } from '../context/DataContext';
+import { useEffect, useState, useCallback } from 'react';
 import { listUsers, listPosts, getUserTotalPoints, isAffiliateActive, manuallyAwardBadge } from '../lib/db';
 import { PUBLISHED_STATUSES, PLATFORMS, STATUSES, PERIODS } from '../lib/constants';
 import { startOfWeek, startOfMonth } from '../lib/points';
@@ -21,30 +20,48 @@ function formatRelative(iso) {
 }
 
 export default function AdminAffiliates() {
-  useDataVersion();
   const [period, setPeriod] = useState('week');
   const [search, setSearch] = useState('');
   const [platform, setPlatform] = useState('');
   const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState([]);
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const affiliates = listUsers({ role: 'affiliate' });
-  const start = periodStart(period);
-  const fromISO = start ? start.toISOString().slice(0, 10) : undefined;
+  const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
 
-  const rows = useMemo(() => {
-    return affiliates
-      .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
-      .map((a) => {
-        const posts = listPosts({ userId: a.id, platform: platform || undefined, status: status || undefined, from: fromISO });
-        const published = posts.filter((p) => PUBLISHED_STATUSES.includes(p.status));
-        const feedbacks = posts.filter((p) => p.feedback && p.feedback.trim()).length;
-        const leads = posts.reduce((s, p) => s + (Number(p.reported_leads) || 0), 0);
-        const sales = posts.reduce((s, p) => s + (Number(p.reported_sales) || 0), 0);
-        const points = getUserTotalPoints(a.id, { since: start || undefined });
-        return { affiliate: a, posts: published.length, feedbacks, leads, sales, points };
-      })
-      .sort((a, b) => b.points - a.points);
-  }, [affiliates, search, platform, status, fromISO, period]);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    (async () => {
+      const affiliates = await listUsers({ role: 'affiliate' });
+      const start = periodStart(period);
+      const fromISO = start ? start.toISOString().slice(0, 10) : undefined;
+
+      const filteredAffs = affiliates.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
+
+      const built = await Promise.all(
+        filteredAffs.map(async (a) => {
+          const posts = await listPosts({ userId: a.id, platform: platform || undefined, status: status || undefined, from: fromISO });
+          const published = posts.filter((p) => PUBLISHED_STATUSES.includes(p.status));
+          const feedbacks = posts.filter((p) => p.feedback && p.feedback.trim()).length;
+          const leads = posts.reduce((s, p) => s + (Number(p.reported_leads) || 0), 0);
+          const sales = posts.reduce((s, p) => s + (Number(p.reported_sales) || 0), 0);
+          const points = await getUserTotalPoints(a.id, { since: start || undefined });
+          const active = await isAffiliateActive(a.id);
+          return { affiliate: a, posts: published.length, feedbacks, leads, sales, points, active };
+        })
+      );
+      built.sort((a, b) => b.points - a.points);
+      if (alive) { setRows(built); setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [search, platform, status, period, refreshTick]);
+
+  const award = async (affiliateId) => {
+    await manuallyAwardBadge(affiliateId, 'Top Helper');
+    reload();
+  };
 
   return (
     <div className="screen">
@@ -65,7 +82,9 @@ export default function AdminAffiliates() {
         </select>
       </div>
 
-      {rows.length === 0 ? (
+      {loading ? (
+        <p className="muted">Loading…</p>
+      ) : rows.length === 0 ? (
         <EmptyState emoji="👥" title="No affiliates match these filters" />
       ) : (
         <div className="table-wrap card">
@@ -95,12 +114,12 @@ export default function AdminAffiliates() {
                   <td><strong>{r.points}</strong></td>
                   <td>{formatRelative(r.affiliate.last_active_at)}</td>
                   <td>
-                    <span className={`chip ${isAffiliateActive(r.affiliate.id) ? 'chip-green' : 'chip-gray'}`}>
-                      {isAffiliateActive(r.affiliate.id) ? 'Active' : 'Inactive'}
+                    <span className={`chip ${r.active ? 'chip-green' : 'chip-gray'}`}>
+                      {r.active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td>
-                    <button className="btn btn-ghost btn-sm" onClick={() => manuallyAwardBadge(r.affiliate.id, 'Top Helper')}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => award(r.affiliate.id)}>
                       🏅 Award
                     </button>
                   </td>

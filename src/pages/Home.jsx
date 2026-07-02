@@ -1,6 +1,6 @@
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useDataVersion } from '../context/DataContext';
 import { listPosts, updatePost, getLeaderboard, listBadges } from '../lib/db';
 import { PUBLISHED_STATUSES } from '../lib/constants';
 import { startOfWeek } from '../lib/points';
@@ -15,19 +15,49 @@ function isThisWeek(dateStr) {
 }
 
 export default function Home() {
-  useDataVersion();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const posts = listPosts({ userId: currentUser.id });
+
+  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState([]);
+  const [badges, setBadges] = useState([]);
+  const [rank, setRank] = useState('—');
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    (async () => {
+      const [userPosts, userBadges, leaderboard] = await Promise.all([
+        listPosts({ userId: currentUser.id }),
+        listBadges({ userId: currentUser.id }),
+        getLeaderboard({ period: 'week', metric: 'overall' }),
+      ]);
+      if (!alive) return;
+      setPosts(userPosts);
+      setBadges(userBadges);
+      const myRow = leaderboard.find((r) => r.user.id === currentUser.id);
+      setRank(myRow ? myRow.position : '—');
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [currentUser.id, refreshTick]);
+
+  const markPosted = async (post) => {
+    await updatePost(post.id, { status: 'Posted' });
+    reload();
+  };
+
+  if (loading) {
+    return <div className="screen"><p className="muted">Loading…</p></div>;
+  }
 
   const thisWeekPosts = posts.filter((p) => isThisWeek(p.date));
   const published = thisWeekPosts.filter((p) => PUBLISHED_STATUSES.includes(p.status));
   const planned = thisWeekPosts.filter((p) => p.status === 'Planned');
   const feedbacks = thisWeekPosts.filter((p) => p.feedback && p.feedback.trim()).length;
-
-  const leaderboard = getLeaderboard({ period: 'week', metric: 'overall' });
-  const myRow = leaderboard.find((r) => r.user.id === currentUser.id);
-  const rank = myRow ? myRow.position : '—';
 
   const needsResults = posts.filter(
     (p) =>
@@ -38,12 +68,6 @@ export default function Home() {
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayPost = posts.find((p) => p.date === todayStr);
-
-  const badges = listBadges({ userId: currentUser.id });
-
-  const markPosted = (post) => {
-    updatePost(post.id, { status: 'Posted' });
-  };
 
   return (
     <div className="screen">

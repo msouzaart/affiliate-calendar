@@ -30,46 +30,63 @@ export default function AddPost({ editMode }) {
 
   const [form, setForm] = useState(emptyForm);
   const [showResults, setShowResults] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(!!(editMode && id));
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (editMode && id) {
-      const post = getPost(id);
-      if (post) {
-        setForm({ ...emptyForm, ...post });
-        const hasResults = [post.reported_views, post.reported_likes, post.reported_comments, post.reported_shares, post.reported_leads, post.reported_sales, post.feedback]
-          .some((v) => v !== '' && v != null);
-        setShowResults(hasResults || !!location.state?.focusResults);
+    let alive = true;
+    (async () => {
+      if (editMode && id) {
+        const post = await getPost(id);
+        if (!alive) return;
+        if (post) {
+          setForm({ ...emptyForm, ...post });
+          const hasResults = [post.reported_views, post.reported_likes, post.reported_comments, post.reported_shares, post.reported_leads, post.reported_sales, post.feedback]
+            .some((v) => v !== '' && v != null);
+          setShowResults(hasResults || !!location.state?.focusResults);
+        }
+        setLoadingInitial(false);
+      } else if (location.state?.ideaId) {
+        const idea = await getIdea(location.state.ideaId);
+        if (!alive) return;
+        if (idea) {
+          setForm({
+            ...emptyForm,
+            title: idea.title,
+            platform: idea.suggested_platform,
+            content_type: idea.suggested_content_type,
+            notes: `Hook: ${idea.hook}\nCTA: ${idea.cta}`,
+            idea_id: idea.id,
+          });
+        }
       }
-    } else if (location.state?.ideaId) {
-      const idea = getIdea(location.state.ideaId);
-      if (idea) {
-        setForm({
-          ...emptyForm,
-          title: idea.title,
-          platform: idea.suggested_platform,
-          content_type: idea.suggested_content_type,
-          notes: `Hook: ${idea.hook}\nCTA: ${idea.cta}`,
-          idea_id: idea.id,
-        });
-      }
-    }
+    })();
+    return () => { alive = false; };
   }, [editMode, id, location.state]);
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.title.trim()) return;
-
-    if (editMode && id) {
-      updatePost(id, form);
-      navigate(`/post/${id}`);
-    } else {
-      const post = createPost(currentUser.id, form);
-      if (form.idea_id) incrementIdeaUsage(form.idea_id);
-      navigate(`/post/${post.id}`);
+    if (!form.title.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      if (editMode && id) {
+        await updatePost(id, form);
+        navigate(`/post/${id}`);
+      } else {
+        const post = await createPost(currentUser.id, form);
+        if (form.idea_id) await incrementIdeaUsage(form.idea_id);
+        navigate(`/post/${post.id}`);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  if (loadingInitial) {
+    return <div className="screen"><p className="muted">Loading…</p></div>;
+  }
 
   return (
     <div className="screen">
@@ -156,8 +173,8 @@ export default function AddPost({ editMode }) {
         <label className="field-label">Notes</label>
         <textarea className="textarea" rows={2} value={form.notes} onChange={update('notes')} placeholder="Anything you want to remember about this post" />
 
-        <button type="submit" className="btn btn-primary btn-block">
-          {editMode ? 'Save changes' : 'Save post'}
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+          {submitting ? 'Saving…' : editMode ? 'Save changes' : 'Save post'}
         </button>
       </form>
     </div>

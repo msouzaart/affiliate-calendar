@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useDataVersion } from '../context/DataContext';
-import { listIdeas, createIdea, toggleSavedIdea, isIdeaSaved } from '../lib/db';
+import { listIdeas, createIdea, toggleSavedIdea } from '../lib/db';
 import { IDEA_CATEGORIES, PLATFORMS, CONTENT_TYPES, DIFFICULTIES } from '../lib/constants';
 import EmptyState from '../components/ui/EmptyState';
 
@@ -17,7 +16,6 @@ const PLATFORM_ICON = {
 };
 
 export default function Ideas({ adminView = false }) {
-  useDataVersion();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [category, setCategory] = useState('');
@@ -29,10 +27,37 @@ export default function Ideas({ adminView = false }) {
   const [form, setForm] = useState(emptyIdea);
   const [copied, setCopied] = useState(false);
 
-  let ideas = listIdeas({ category: category || undefined });
+  const [loading, setLoading] = useState(true);
+  const [allIdeas, setAllIdeas] = useState([]);
+  const [savedIds, setSavedIds] = useState(() => new Set(currentUser.saved_idea_ids || []));
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    listIdeas({}).then((ideas) => {
+      if (alive) { setAllIdeas(ideas); setLoading(false); }
+    });
+    return () => { alive = false; };
+  }, [refreshTick]);
+
+  const isSaved = (ideaId) => savedIds.has(ideaId);
+
+  const handleToggleSave = async (ideaId) => {
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(ideaId)) next.delete(ideaId); else next.add(ideaId);
+      return next;
+    });
+    await toggleSavedIdea(currentUser.id, ideaId);
+  };
+
+  let ideas = category ? allIdeas.filter((i) => i.category === category) : allIdeas;
   if (platform) ideas = ideas.filter((i) => i.suggested_platform === platform);
   if (contentType) ideas = ideas.filter((i) => i.suggested_content_type === contentType);
-  if (savedOnly) ideas = ideas.filter((i) => isIdeaSaved(currentUser.id, i.id));
+  if (savedOnly) ideas = ideas.filter((i) => isSaved(i.id));
   if (adminView) ideas = [...ideas].sort((a, b) => (b.used_count || 0) - (a.used_count || 0));
 
   const selected = useMemo(
@@ -51,13 +76,18 @@ export default function Ideas({ adminView = false }) {
 
   const clearFilters = () => { setCategory(''); setPlatform(''); setContentType(''); setSavedOnly(false); };
 
-  const submitIdea = (e) => {
+  const submitIdea = async (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    createIdea(form);
+    await createIdea(form);
     setForm(emptyIdea);
     setShowForm(false);
+    reload();
   };
+
+  if (loading) {
+    return <div className="screen"><p className="muted">Loading…</p></div>;
+  }
 
   return (
     <div className="screen">
@@ -148,7 +178,7 @@ export default function Ideas({ adminView = false }) {
           <div className="idea-list">
             <div className="muted-sm" style={{ marginBottom: 2 }}>{ideas.length} ideas found</div>
             {ideas.map((idea) => {
-              const saved = !adminView && isIdeaSaved(currentUser.id, idea.id);
+              const saved = !adminView && isSaved(idea.id);
               const isSelected = selected?.id === idea.id;
               return (
                 <div
@@ -166,7 +196,7 @@ export default function Ideas({ adminView = false }) {
                     {!adminView ? (
                       <button
                         className={`bookmark-btn ${saved ? 'saved' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); toggleSavedIdea(currentUser.id, idea.id); }}
+                        onClick={(e) => { e.stopPropagation(); handleToggleSave(idea.id); }}
                         aria-label="Save idea"
                       >
                         {saved ? '★' : '☆'}
@@ -201,10 +231,10 @@ export default function Ideas({ adminView = false }) {
                 </span>
                 {!adminView && (
                   <button
-                    className={`bookmark-btn ${isIdeaSaved(currentUser.id, selected.id) ? 'saved' : ''}`}
-                    onClick={() => toggleSavedIdea(currentUser.id, selected.id)}
+                    className={`bookmark-btn ${isSaved(selected.id) ? 'saved' : ''}`}
+                    onClick={() => handleToggleSave(selected.id)}
                   >
-                    {isIdeaSaved(currentUser.id, selected.id) ? '★ Saved' : '☆ Save'}
+                    {isSaved(selected.id) ? '★ Saved' : '☆ Save'}
                   </button>
                 )}
               </div>

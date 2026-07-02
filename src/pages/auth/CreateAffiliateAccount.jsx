@@ -9,10 +9,11 @@ export default function CreateAffiliateAccount({ onGoAffiliateSignIn, onGoAdminS
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     if (!form.name.trim() || !form.email.trim() || !form.username.trim() || !form.password) {
@@ -23,9 +24,15 @@ export default function CreateAffiliateAccount({ onGoAffiliateSignIn, onGoAdminS
       setError('Passwords do not match.');
       return;
     }
-    const result = signUpAffiliateUser({
+    if (form.password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    setSubmitting(true);
+    const result = await signUpAffiliateUser({
       name: form.name, email: form.email, username: form.username, password: form.password,
     });
+    setSubmitting(false);
     if (result.error) setError(result.error);
   };
 
@@ -57,7 +64,7 @@ export default function CreateAffiliateAccount({ onGoAffiliateSignIn, onGoAdminS
             <input
               className="input" style={{ paddingLeft: 12, paddingRight: 38 }}
               type={showPw ? 'text' : 'password'} value={form.password} onChange={update('password')}
-              placeholder="Create a password"
+              placeholder="Create a password (min 6 characters)"
             />
             <button type="button" className="input-icon-toggle" onClick={() => setShowPw((s) => !s)}>
               {showPw ? 'Hide' : 'Show'}
@@ -82,7 +89,9 @@ export default function CreateAffiliateAccount({ onGoAffiliateSignIn, onGoAdminS
 
           {error && <div className="chip chip-amber" style={{ marginBottom: 8 }}>{error}</div>}
 
-          <button type="submit" className="btn btn-primary btn-block">Create account →</button>
+          <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+            {submitting ? 'Creating account…' : 'Create account →'}
+          </button>
         </form>
 
         <div className="auth-divider">or</div>

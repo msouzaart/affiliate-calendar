@@ -8,11 +8,14 @@ export default function AffiliateSignIn({ onGoCreate, onGoAdminSignIn }) {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const result = signInAffiliateUser({ identifier, password });
+    setSubmitting(true);
+    const result = await signInAffiliateUser({ identifier, password });
+    setSubmitting(false);
     if (result.error) setError(result.error);
   };
 
@@ -26,10 +29,10 @@ export default function AffiliateSignIn({ onGoCreate, onGoAdminSignIn }) {
         <p className="auth-subtext">Access your own dashboard, calendar, post ideas, and activity.</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          <label className="field-label">Email or username</label>
+          <label className="field-label">Email</label>
           <div className="input-icon-wrap">
             <span className="input-icon-left">👤</span>
-            <input className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="Enter your email or username" />
+            <input className="input" type="email" value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="Enter your email" />
           </div>
 
           <label className="field-label">Password</label>
@@ -59,7 +62,9 @@ export default function AffiliateSignIn({ onGoCreate, onGoAdminSignIn }) {
 
           {error && <div className="chip chip-amber" style={{ margin: '10px 0' }}>{error}</div>}
 
-          <button type="submit" className="btn btn-primary btn-block">Sign in →</button>
+          <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+            {submitting ? 'Signing in…' : 'Sign in →'}
+          </button>
         </form>
 
         <button className="btn btn-ghost btn-block" onClick={onGoCreate} style={{ marginTop: 10 }}>Create affiliate account →</button>

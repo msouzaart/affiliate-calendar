@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDataVersion } from '../context/DataContext';
 import {
   listUsers, listPosts, getLeaderboard, getPostsNeedingReview,
-  getBestFeedback, getBestPerformingIdeas, isAffiliateActive, manuallyAwardBadge, signUpAffiliate,
+  getBestFeedback, getBestPerformingIdeas, isAffiliateActive, manuallyAwardBadge,
 } from '../lib/db';
 import { PUBLISHED_STATUSES } from '../lib/constants';
 import { startOfWeek } from '../lib/points';
@@ -11,80 +10,99 @@ import Stat from '../components/ui/Stat';
 import StatusChip from '../components/ui/StatusChip';
 import EmptyState from '../components/ui/EmptyState';
 
-const emptyAffiliateForm = { name: '', email: '', username: '', password: '' };
-
 export default function AdminDashboard() {
-  useDataVersion();
   const navigate = useNavigate();
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState(emptyAffiliateForm);
-  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
 
-  const affiliates = listUsers({ role: 'affiliate' });
-  const start = startOfWeek(new Date());
-  const allPosts = listPosts({});
-  const weekPosts = allPosts.filter((p) => new Date(p.date) >= start);
-  const weekPublished = weekPosts.filter((p) => PUBLISHED_STATUSES.includes(p.status));
-  const feedbacks = weekPosts.filter((p) => p.feedback && p.feedback.trim()).length;
-  const leads = weekPosts.reduce((s, p) => s + (Number(p.reported_leads) || 0), 0);
-  const sales = weekPosts.reduce((s, p) => s + (Number(p.reported_sales) || 0), 0);
-  const activeCount = affiliates.filter((a) => isAffiliateActive(a.id)).length;
+  const [loading, setLoading] = useState(true);
+  const [affiliates, setAffiliates] = useState([]);
+  const [weekPublished, setWeekPublished] = useState([]);
+  const [feedbacks, setFeedbacks] = useState(0);
+  const [leads, setLeads] = useState(0);
+  const [sales, setSales] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [topFive, setTopFive] = useState([]);
+  const [winnerCandidate, setWinnerCandidate] = useState(null);
+  const [reviewPosts, setReviewPosts] = useState([]);
+  const [bestFeedback, setBestFeedback] = useState([]);
+  const [bestIdeas, setBestIdeas] = useState([]);
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  const leaderboard = getLeaderboard({ period: 'week', metric: 'overall' });
-  const topFive = leaderboard.slice(0, 5);
-  const reviewPosts = getPostsNeedingReview();
-  const bestFeedback = getBestFeedback(5);
-  const bestIdeas = getBestPerformingIdeas(5);
-  const winnerCandidate = leaderboard[0];
+  const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
 
-  const handleCreateAffiliate = (e) => {
-    e.preventDefault();
-    setError('');
-    if (!form.name.trim() || !form.email.trim() || !form.username.trim() || !form.password) {
-      setError('Please fill in every field.');
-      return;
-    }
-    const result = signUpAffiliate(form);
-    if (result.error) { setError(result.error); return; }
-    setForm(emptyAffiliateForm);
-    setShowCreate(false);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    (async () => {
+      const affs = await listUsers({ role: 'affiliate' });
+      const start = startOfWeek(new Date());
+      const allPosts = await listPosts({});
+      const weekPosts = allPosts.filter((p) => new Date(p.date) >= start);
+      const published = weekPosts.filter((p) => PUBLISHED_STATUSES.includes(p.status));
+      const fb = weekPosts.filter((p) => p.feedback && p.feedback.trim()).length;
+      const ld = weekPosts.reduce((s, p) => s + (Number(p.reported_leads) || 0), 0);
+      const sl = weekPosts.reduce((s, p) => s + (Number(p.reported_sales) || 0), 0);
+      const activeFlags = await Promise.all(affs.map((a) => isAffiliateActive(a.id)));
+      const active = activeFlags.filter(Boolean).length;
+
+      const leaderboard = await getLeaderboard({ period: 'week', metric: 'overall' });
+      const review = await getPostsNeedingReview();
+      const feedback = await getBestFeedback(5);
+      const ideas = await getBestPerformingIdeas(5);
+
+      if (!alive) return;
+      setAffiliates(affs);
+      setWeekPublished(published);
+      setFeedbacks(fb);
+      setLeads(ld);
+      setSales(sl);
+      setActiveCount(active);
+      setTopFive(leaderboard.slice(0, 5));
+      setWinnerCandidate(leaderboard[0] || null);
+      setReviewPosts(review);
+      setBestFeedback(feedback);
+      setBestIdeas(ideas);
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [refreshTick]);
+
+  const copyInviteLink = () => {
+    const link = window.location.origin;
+    navigator.clipboard?.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  const awardWeeklyWinner = async () => {
+    await manuallyAwardBadge(winnerCandidate.user.id, 'Weekly Winner');
+    reload();
   };
 
   const headerActions = (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      <button className="btn btn-primary btn-sm" onClick={() => setShowCreate((s) => !s)}>+ Create affiliate</button>
       <button className="btn btn-secondary btn-sm" onClick={() => navigate('/admin/ideas')}>Add idea</button>
       <button className="btn btn-ghost btn-sm" onClick={() => navigate('/admin/reports')}>Export report</button>
     </div>
   );
 
-  const createForm = showCreate && (
-    <form className="card form" onSubmit={handleCreateAffiliate}>
-      <div className="card-section-title">Create affiliate account</div>
-      <div className="field-row">
-        <div className="field-col">
-          <label className="field-label">Full name</label>
-          <input className="input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-        </div>
-        <div className="field-col">
-          <label className="field-label">Email</label>
-          <input className="input" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-        </div>
-      </div>
-      <div className="field-row">
-        <div className="field-col">
-          <label className="field-label">Username</label>
-          <input className="input" value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
-        </div>
-        <div className="field-col">
-          <label className="field-label">Temporary password</label>
-          <input className="input" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
-        </div>
-      </div>
-      {error && <div className="chip chip-amber" style={{ margin: '8px 0' }}>{error}</div>}
-      <button type="submit" className="btn btn-primary btn-block">Create affiliate</button>
-    </form>
+  const inviteCard = (
+    <section className="card">
+      <div className="card-section-title">Invite affiliates</div>
+      <p className="muted" style={{ marginBottom: 10 }}>
+        Affiliates create their own account from the app's sign-up screen (choose "Create affiliate account").
+        Share this link so they can join.
+      </p>
+      <button className="btn btn-secondary btn-sm" onClick={copyInviteLink}>
+        {copied ? 'Link copied ✓' : '🔗 Copy invite link'}
+      </button>
+    </section>
   );
+
+  if (loading) {
+    return <div className="screen"><p className="muted">Loading…</p></div>;
+  }
 
   if (affiliates.length === 0) {
     return (
@@ -96,8 +114,8 @@ export default function AdminDashboard() {
           </div>
           {headerActions}
         </div>
-        {createForm}
-        <EmptyState emoji="👋" title="No affiliates yet" subtitle="Create the first affiliate account above, or wait for affiliates to self-sign-up." />
+        {inviteCard}
+        <EmptyState emoji="👋" title="No affiliates yet" subtitle="Share the invite link above so affiliates can create their own accounts." />
       </div>
     );
   }
@@ -112,7 +130,7 @@ export default function AdminDashboard() {
         {headerActions}
       </div>
 
-      {createForm}
+      {inviteCard}
 
       <section className="card">
         <div className="card-section-title">This week</div>
@@ -132,7 +150,7 @@ export default function AdminDashboard() {
             🎉 <strong>{winnerCandidate.user.name}</strong> is leading this week with {winnerCandidate.points} points,
             {' '}{winnerCandidate.posts} posts and {winnerCandidate.sales} reported sales.
           </p>
-          <button className="btn btn-primary btn-sm" onClick={() => manuallyAwardBadge(winnerCandidate.user.id, 'Weekly Winner')}>
+          <button className="btn btn-primary btn-sm" onClick={awardWeeklyWinner}>
             Award "Weekly Winner" badge
           </button>
         </section>

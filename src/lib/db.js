@@ -130,6 +130,15 @@ export async function deleteAffiliate(userId) {
   await deleteDoc(doc(firestore, 'profiles', userId));
 }
 
+// Grants admin access to an existing profile (affiliate → admin). This is the
+// internal-only path for adding admins: it never touches Firebase Auth, only
+// flips the role field on an already-existing profile document, so it can
+// only be used on someone who already has an account in this app.
+export async function promoteToAdmin(userId) {
+  await updateDoc(doc(firestore, 'profiles', userId), { role: 'admin' });
+  return getUser(userId);
+}
+
 // ---------------------------------------------------------------------------
 // Posts
 // ---------------------------------------------------------------------------

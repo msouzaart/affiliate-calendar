@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { listUsers, listPosts, getUserTotalPoints, isAffiliateActive, manuallyAwardBadge, deleteAffiliate } from '../lib/db';
+import { listUsers, listPosts, getUserTotalPoints, isAffiliateActive, manuallyAwardBadge, deleteAffiliate, promoteToAdmin } from '../lib/db';
 import { PUBLISHED_STATUSES, PLATFORMS, STATUSES, PERIODS } from '../lib/constants';
 import { startOfWeek, startOfMonth } from '../lib/points';
 import EmptyState from '../components/ui/EmptyState';
@@ -28,6 +28,7 @@ export default function AdminAffiliates() {
   const [rows, setRows] = useState([]);
   const [refreshTick, setRefreshTick] = useState(0);
   const [deletingId, setDeletingId] = useState(null);
+  const [promotingId, setPromotingId] = useState(null);
   const [error, setError] = useState('');
 
   const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
@@ -63,6 +64,23 @@ export default function AdminAffiliates() {
   const award = async (affiliateId) => {
     await manuallyAwardBadge(affiliateId, 'Top Helper');
     reload();
+  };
+
+  const handlePromote = async (affiliate) => {
+    const confirmed = window.confirm(
+      `Make ${affiliate.name} an admin? They will get full admin access next time they sign in. This can't be undone from here.`
+    );
+    if (!confirmed) return;
+    setError('');
+    setPromotingId(affiliate.id);
+    try {
+      await promoteToAdmin(affiliate.id);
+      reload();
+    } catch (e) {
+      setError(e?.message || `Could not promote ${affiliate.name}. Please try again.`);
+    } finally {
+      setPromotingId(null);
+    }
   };
 
   const handleDelete = async (affiliate) => {
@@ -142,6 +160,13 @@ export default function AdminAffiliates() {
                   <td style={{ display: 'flex', gap: 6 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => award(r.affiliate.id)}>
                       🏅 Award
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      disabled={promotingId === r.affiliate.id}
+                      onClick={() => handlePromote(r.affiliate)}
+                    >
+                      {promotingId === r.affiliate.id ? 'Promoting…' : '⬆ Make admin'}
                     </button>
                     <button
                       className="btn btn-ghost btn-sm"

@@ -3,5 +3,5 @@
 export const APP_NAME = 'Chalky CampaignFlow';
 export const APP_DESCRIPTOR = 'Affiliate posting calendar & campaign tracker';
 export const PROGRAM_NAME = 'Chalky';
-export const DEFAULT_ADMIN_NAME = 'Program Admin';
-export const DEFAULT_ADMIN_EMAIL = 'admin@chalky.com';
+export const DEFAULT_ADMIN_NAME = 'Marcela';
+export const DEFAULT_ADMIN_EMAIL = 'marcela@chalky.school';

@@ -2,9 +2,14 @@ import { useEffect, useState } from 'react';
 import { useWalkthrough } from '../../context/WalkthroughContext';
 
 const MOBILE_BREAKPOINT = 640;
-const MAX_FIND_ATTEMPTS = 30;
+const MAX_FIND_ATTEMPTS = 30; // ~6s — generous, covers page nav + Firestore data loads
+const MAX_FIND_ATTEMPTS_OPTIONAL = 6; // ~1.2s — optional steps' targets are either already
+// on-screen (same page as the previous step) or genuinely don't exist for this account, so
+// there's no reason to make the user wait 6 seconds to find that out.
 const FIND_RETRY_MS = 200;
 const RENAVIGATE_EVERY = 4; // re-issue navigate() every N failed attempts, in case the first call didn't stick
+const TOOLTIP_WIDTH = 340;
+const TOOLTIP_EST_HEIGHT = 200; // rough estimate, used only to keep the box fully on-screen
 
 function findVisibleTarget(selector) {
   if (!selector) return null;
@@ -36,8 +41,18 @@ export default function TourOverlay() {
     let cancelled = false;
     let attempts = 0;
     let beforeShowFired = false;
+    const maxAttempts = currentStep.optional ? MAX_FIND_ATTEMPTS_OPTIONAL : MAX_FIND_ATTEMPTS;
     setReady(false);
     setRect(null);
+
+    function giveUp() {
+      if (currentStep.optional) {
+        next();
+      } else {
+        setRect(null);
+        setReady(true);
+      }
+    }
 
     function tick() {
       if (cancelled) return;
@@ -49,13 +64,10 @@ export default function TourOverlay() {
           navigate(currentStep.route);
         }
         attempts += 1;
-        if (attempts < MAX_FIND_ATTEMPTS) {
+        if (attempts < maxAttempts) {
           setTimeout(tick, FIND_RETRY_MS);
-        } else if (currentStep.optional) {
-          next();
         } else {
-          setRect(null);
-          setReady(true);
+          giveUp();
         }
         return;
       }
@@ -77,13 +89,10 @@ export default function TourOverlay() {
       }
 
       attempts += 1;
-      if (attempts < MAX_FIND_ATTEMPTS) {
+      if (attempts < maxAttempts) {
         setTimeout(tick, FIND_RETRY_MS);
-      } else if (currentStep.optional) {
-        next();
       } else {
-        setRect(null);
-        setReady(true);
+        giveUp();
       }
     }
 
@@ -148,19 +157,26 @@ export default function TourOverlay() {
     tooltipClass += ' tour-tooltip-sheet';
   } else if (rect) {
     const margin = 16;
-    const tooltipWidth = 340;
     const vh = window.innerHeight;
     const vw = window.innerWidth;
-    const spaceBelow = vh - rect.bottom;
-    const placeAbove = spaceBelow < 220 && rect.top > 220;
 
-    tooltipStyle.left = Math.min(Math.max(rect.left, margin), Math.max(margin, vw - tooltipWidth - margin));
-    if (placeAbove) {
-      tooltipStyle.top = Math.max(margin, rect.top - 12);
-      tooltipStyle.transform = 'translateY(-100%)';
+    tooltipStyle.left = Math.min(Math.max(rect.left, margin), Math.max(margin, vw - TOOLTIP_WIDTH - margin));
+
+    // Prefer directly below the element, then directly above it, then — for
+    // elements that are themselves taller than the viewport (a long form, a
+    // big table) where neither truly fits — just clamp the box fully inside
+    // the viewport instead of letting it hang off the bottom edge.
+    const spaceBelow = vh - rect.bottom;
+    const spaceAbove = rect.top;
+    let top;
+    if (spaceBelow >= TOOLTIP_EST_HEIGHT + margin) {
+      top = rect.bottom + 12;
+    } else if (spaceAbove >= TOOLTIP_EST_HEIGHT + margin) {
+      top = rect.top - TOOLTIP_EST_HEIGHT - 12;
     } else {
-      tooltipStyle.top = Math.min(rect.bottom + 12, vh - 120);
+      top = vh / 2 - TOOLTIP_EST_HEIGHT / 2;
     }
+    tooltipStyle.top = Math.min(Math.max(top, margin), Math.max(margin, vh - TOOLTIP_EST_HEIGHT - margin));
   } else {
     tooltipClass += ' tour-tooltip-center';
   }

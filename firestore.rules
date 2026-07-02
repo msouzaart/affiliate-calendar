@@ -16,18 +16,27 @@ service cloud.firestore {
         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function adminAlreadyExists() {
+      return exists(/databases/$(database)/documents/meta/adminStatus) &&
+        get(/databases/$(database)/documents/meta/adminStatus).data.exists == true;
+    }
+
     // Tiny public status doc — lets the sign-in screen check "does an admin
-    // account already exist?" before anyone is signed in, without exposing
-    // the full profiles collection to anonymous reads.
+    // account already exist?" before anyone is signed in.
     match /meta/adminStatus {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // One profile document per authenticated user, keyed by their auth uid.
+    // Profiles are readable by any signed-in program member — needed for the
+    // leaderboard, admin views, and showing names on posts. Only the owner
+    // can create/update their own profile (or an admin can update anyone's).
+    // Only one admin account may ever be created (enforced here, not just in
+    // the UI).
     match /profiles/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) &&
+        (request.resource.data.role != 'admin' || !adminAlreadyExists());
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if false;
     }
@@ -38,23 +47,25 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Each post belongs to one affiliate (user_id field); admins can see/manage all.
+    // Posts are readable by any signed-in member (leaderboard, admin views);
+    // only the owning affiliate (or an admin) can create/update/delete.
     match /posts/{postId} {
-      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
       allow update, delete: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
     }
 
-    // Points ledger — written automatically by the app, never edited after the fact.
+    // Points ledger — readable by any signed-in member (leaderboard totals);
+    // written automatically by the app, never edited after the fact.
     match /points/{pointId} {
-      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid || isAdmin());
       allow update, delete: if false;
     }
 
     // Badges earned — same pattern as points.
     match /badges/{badgeId} {
-      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && (request.resource.data.user_id == request.auth.uid || isAdmin());
       allow update, delete: if false;
     }

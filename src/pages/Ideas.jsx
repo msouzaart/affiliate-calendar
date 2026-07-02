@@ -7,7 +7,7 @@ import EmptyState from '../components/ui/EmptyState';
 
 const emptyIdea = {
   title: '', category: 'Reading', suggested_platform: 'Instagram', suggested_content_type: 'Reel',
-  hook: '', cta: '', difficulty: 'Easy', estimated_time: '15 min',
+  hook: '', cta: '', difficulty: 'Easy', estimated_time: '15 min', reference_video_url: '',
 };
 
 const PLATFORM_ICON = {
@@ -147,6 +147,13 @@ export default function Ideas({ adminView = false }) {
           <input className="input" value={form.hook} onChange={(e) => setForm((f) => ({ ...f, hook: e.target.value }))} />
           <label className="field-label">CTA</label>
           <input className="input" value={form.cta} onChange={(e) => setForm((f) => ({ ...f, cta: e.target.value }))} />
+          <label className="field-label">Reference video link (optional)</label>
+          <input
+            className="input" type="url" placeholder="https://..."
+            value={form.reference_video_url}
+            onChange={(e) => setForm((f) => ({ ...f, reference_video_url: e.target.value }))}
+          />
+          <div className="field-note">Link to an example video affiliates can watch for inspiration.</div>
           <label className="field-label">Estimated time</label>
           <input className="input" value={form.estimated_time} onChange={(e) => setForm((f) => ({ ...f, estimated_time: e.target.value }))} />
           <button type="submit" className="btn btn-primary btn-block">Add idea to library</button>
@@ -243,6 +250,18 @@ export default function Ideas({ adminView = false }) {
                 <div style={{ textAlign: 'center', padding: '0 20px' }}>
                   <div style={{ fontSize: 28, marginBottom: 6 }}>{PLATFORM_ICON[selected.suggested_platform]}</div>
                   <strong style={{ color: 'var(--navy)' }}>{selected.title}</strong>
+                  {selected.reference_video_url && (
+                    <div style={{ marginTop: 10 }}>
+                      <a
+                        className="btn btn-secondary btn-sm"
+                        href={selected.reference_video_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        ▶ Watch reference video ↗
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
 

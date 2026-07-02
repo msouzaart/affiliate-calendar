@@ -19,6 +19,7 @@ export default function PostDetail() {
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [refreshTick, setRefreshTick] = useState(0);
 
   const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
@@ -34,23 +35,41 @@ export default function PostDetail() {
 
   const changeStatus = async (status) => {
     setBusy(true);
-    await updatePost(post.id, { status });
-    setBusy(false);
-    reload();
+    setError('');
+    try {
+      await updatePost(post.id, { status });
+      reload();
+    } catch (e) {
+      setError(e?.message || 'Could not update this post. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const asNewPost = async () => {
     setBusy(true);
-    const copy = await duplicatePostAsNew(post.id);
-    setBusy(false);
-    navigate(`/post/${copy.id}/edit`);
+    setError('');
+    try {
+      const copy = await duplicatePostAsNew(post.id);
+      navigate(`/post/${copy.id}/edit`);
+    } catch (e) {
+      setError(e?.message || 'Could not duplicate this post. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const asIdea = async () => {
     setBusy(true);
-    await duplicatePostAsIdea(post.id);
-    setBusy(false);
-    navigate('/ideas');
+    setError('');
+    try {
+      await duplicatePostAsIdea(post.id);
+      navigate('/ideas');
+    } catch (e) {
+      setError(e?.message || 'Could not duplicate this post as an idea. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (loading) {
@@ -113,18 +132,20 @@ export default function PostDetail() {
         </section>
       )}
 
+      {error && <div className="chip chip-amber" style={{ marginBottom: 10 }}>{error}</div>}
+
       <section className="card action-list">
         <button className="btn btn-primary btn-block" disabled={busy} onClick={() => navigate(`/post/${post.id}/edit`, { state: { focusResults: true } })}>
           Update results
         </button>
         {post.status === 'Planned' && (
           <button className="btn btn-secondary btn-block" disabled={busy} onClick={() => changeStatus('Posted')}>
-            Mark as posted
+            {busy ? 'Working…' : 'Mark as posted'}
           </button>
         )}
         {post.status !== 'Completed' && (
           <button className="btn btn-secondary btn-block" disabled={busy} onClick={() => changeStatus('Completed')}>
-            Mark as completed
+            {busy ? 'Working…' : 'Mark as completed'}
           </button>
         )}
         <button className="btn btn-ghost btn-block" disabled={busy} onClick={asNewPost}>

@@ -335,6 +335,7 @@ export async function createIdea(data) {
     suggested_content_type: data.suggested_content_type,
     hook: data.hook || '',
     cta: data.cta || '',
+    reference_video_url: data.reference_video_url || '',
     difficulty: data.difficulty || 'Easy',
     estimated_time: data.estimated_time || '15 min',
     is_active: true,

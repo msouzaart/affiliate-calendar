@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useWalkthrough } from '../../context/WalkthroughContext';
 
 const MOBILE_BREAKPOINT = 640;
 const MAX_FIND_ATTEMPTS = 30;
 const FIND_RETRY_MS = 200;
+const RENAVIGATE_EVERY = 4; // re-issue navigate() every N failed attempts, in case the first call didn't stick
 
 function findVisibleTarget(selector) {
   if (!selector) return null;
@@ -20,50 +21,64 @@ function isMobileViewport() {
 }
 
 export default function TourOverlay() {
-  const { active, currentStep, stepIndex, totalSteps, next, back, skip, finish, navigate, location } = useWalkthrough();
+  const { active, currentStep, stepIndex, totalSteps, next, back, skip, finish, navigate } = useWalkthrough();
 
   const [rect, setRect] = useState(null);
   const [ready, setReady] = useState(false);
   const [mobile, setMobile] = useState(isMobileViewport());
-  const attemptsRef = useRef(0);
-  const cancelledRef = useRef(false);
 
-  // Navigate to the step's route (if any) and fire its beforeShow action.
+  // Drives one self-contained poll loop per step: reads the *live* URL
+  // (window.location, not a possibly-stale React value) on every tick, so it
+  // keeps retrying navigation if the first attempt didn't stick, then keeps
+  // retrying the element lookup until the page has actually rendered it.
   useEffect(() => {
     if (!active || !currentStep) return;
-    if (currentStep.route && location.pathname !== currentStep.route) {
-      navigate(currentStep.route);
-    }
-    if (currentStep.beforeShow) {
-      window.dispatchEvent(new CustomEvent('chalky:tour-action', { detail: currentStep.beforeShow }));
-    }
-  }, [active, currentStep?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Locate the target element, retrying while the page/data finishes
-  // loading. Falls back to a centered tooltip if it truly never appears;
-  // silently advances past optional steps instead.
-  useEffect(() => {
-    if (!active || !currentStep) return;
-    cancelledRef.current = false;
-    attemptsRef.current = 0;
+    let cancelled = false;
+    let attempts = 0;
+    let beforeShowFired = false;
     setReady(false);
     setRect(null);
 
-    function tryFind() {
-      if (cancelledRef.current) return;
+    function tick() {
+      if (cancelled) return;
+
+      const onRightPage = !currentStep.route || window.location.pathname === currentStep.route;
+
+      if (!onRightPage) {
+        if (attempts % RENAVIGATE_EVERY === 0) {
+          navigate(currentStep.route);
+        }
+        attempts += 1;
+        if (attempts < MAX_FIND_ATTEMPTS) {
+          setTimeout(tick, FIND_RETRY_MS);
+        } else if (currentStep.optional) {
+          next();
+        } else {
+          setRect(null);
+          setReady(true);
+        }
+        return;
+      }
+
+      if (currentStep.beforeShow && !beforeShowFired) {
+        beforeShowFired = true;
+        window.dispatchEvent(new CustomEvent('chalky:tour-action', { detail: currentStep.beforeShow }));
+      }
+
       const el = findVisibleTarget(currentStep.selector);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
         setTimeout(() => {
-          if (cancelledRef.current) return;
+          if (cancelled) return;
           setRect(el.getBoundingClientRect());
           setReady(true);
         }, 220);
         return;
       }
-      if (attemptsRef.current < MAX_FIND_ATTEMPTS) {
-        attemptsRef.current += 1;
-        setTimeout(tryFind, FIND_RETRY_MS);
+
+      attempts += 1;
+      if (attempts < MAX_FIND_ATTEMPTS) {
+        setTimeout(tick, FIND_RETRY_MS);
       } else if (currentStep.optional) {
         next();
       } else {
@@ -71,9 +86,10 @@ export default function TourOverlay() {
         setReady(true);
       }
     }
-    tryFind();
-    return () => { cancelledRef.current = true; };
-  }, [active, currentStep?.id, location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    tick();
+    return () => { cancelled = true; };
+  }, [active, currentStep?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the highlight glued to the target on resize/scroll.
   useEffect(() => {
@@ -91,7 +107,27 @@ export default function TourOverlay() {
     };
   }, [ready, currentStep?.selector]);
 
-  if (!active || !currentStep || !ready) return null;
+  if (!active || !currentStep) return null;
+
+  if (!ready) {
+    // Still navigating to the right page / waiting for the target element
+    // to render. Always show *something* — a bare overlay with no way out
+    // reads as "frozen", even though it's just loading.
+    return (
+      <>
+        <div className="tour-click-blocker" />
+        <div className="tour-tooltip tour-tooltip-center">
+          <button className="tour-close-btn" aria-label="Close tour" onClick={skip}>✕</button>
+          <div className="tour-progress">Step {stepIndex + 1} of {totalSteps}</div>
+          <div className="tour-title">{currentStep.title}</div>
+          <div className="tour-text">Loading this part of the app…</div>
+          <div className="tour-actions">
+            <button className="btn btn-ghost btn-sm" onClick={skip}>Skip tour</button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   const isFirst = stepIndex === 0;
   const isLast = !!currentStep.isFinish || stepIndex === totalSteps - 1;

@@ -504,3 +504,28 @@ button { font-family: inherit; cursor: pointer; }
 }
 .tour-tooltip-sheet .tour-actions-right .btn,
 .tour-tooltip-sheet .tour-actions .btn { padding: 11px 16px; font-size: 14px; }
+
+/* Floating "replay tour" button — visible on every screen */
+.tour-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 76px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  font-size: 20px;
+  font-weight: 700;
+  box-shadow: var(--shadow-card-hover);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tour-fab:hover { background: var(--navy-600); }
+.tour-fab:active { transform: scale(0.96); }
+@media (min-width: 900px) {
+  .tour-fab { bottom: 24px; }
+}
